@@ -24,7 +24,7 @@ namespace GraphConsoleAppV3
         /// <returns>Token for application.</returns>
         public static string GetTokenForApplication()
         {
-            AuthenticationContext authenticationContext = new AuthenticationContext(Constants.AuthString, false);
+            AuthenticationContext authenticationContext = new AuthenticationContext(Constants.AuthStringAppOnly, false);
             // Config for OAuth client credentials 
             ClientCredential clientCred = new ClientCredential(Constants.ClientId, Constants.ClientSecret);
             AuthenticationResult authenticationResult = authenticationContext.AcquireToken(Constants.ResourceUrl,
@@ -40,7 +40,7 @@ namespace GraphConsoleAppV3
         public static ActiveDirectoryClient GetActiveDirectoryClientAsApplication()
         {
             Uri servicePointUri = new Uri(Constants.ResourceUrl);
-            Uri serviceRoot = new Uri(servicePointUri, Constants.TenantId);
+            Uri serviceRoot = new Uri(servicePointUri, Constants.TenantIdAppOnly);
             ActiveDirectoryClient activeDirectoryClient = new ActiveDirectoryClient(serviceRoot,
                 async () => await AcquireTokenAsyncForApplication());
             return activeDirectoryClient;
@@ -66,7 +66,7 @@ namespace GraphConsoleAppV3
                 var redirectUri = new Uri("https://localhost");
                 AuthenticationContext authenticationContext = new AuthenticationContext(Constants.AuthString, false);
                 AuthenticationResult userAuthnResult = authenticationContext.AcquireToken(Constants.ResourceUrl,
-                    Constants.ClientIdForUserAuthn, redirectUri, PromptBehavior.Always);
+                    Constants.ClientIdForUserAuthn, redirectUri, PromptBehavior.RefreshSession);
                 TokenForUser = userAuthnResult.AccessToken;
                 Console.WriteLine("\n Welcome " + userAuthnResult.UserInfo.GivenName + " " +
                                   userAuthnResult.UserInfo.FamilyName);
