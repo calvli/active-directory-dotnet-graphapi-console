@@ -35,17 +35,15 @@ namespace GraphConsoleAppV3
             {
                 client = AuthenticationHelper.GetActiveDirectoryClientAsUser(); ;
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Acquiring a token failed with the following error: {0}", ex.Message);
-                if (ex.InnerException != null)
+                Program.WriteError("Acquiring a token failed with the following error: {0}", e.Message);
+                if (e.InnerException != null)
                 {
-                    //You should implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
+                    //TODO: Implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
                     //InnerException Message will contain the HTTP error status codes mentioned in the link above
-                    Console.WriteLine("Error detail: {0}", ex.InnerException.Message);
+                    Program.WriteError("Error detail: {0}", e.InnerException.Message);
                 }
-                Console.ResetColor();
                 Console.ReadKey();
                 return;
             }
@@ -92,7 +90,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting TenantDetails {0} {1}", e.Message,
+                Program.WriteError("\nError getting TenantDetails {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -131,7 +129,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting signed in user {0} {1}", e.Message,
+                Program.WriteError("\nError getting signed in user {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -151,7 +149,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError getting the user's photo - may not exist {0} {1}", e.Message,
+                    Program.WriteError("\nError getting the user's photo - may not exist {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -178,7 +176,7 @@ namespace GraphConsoleAppV3
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("\nError Updating the user photo {0} {1}", e.Message,
+                        Program.WriteError("\nError Updating the user photo {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                     }
                 }
@@ -212,7 +210,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting User {0} {1}", e.Message,
+                Program.WriteError("\nError getting User {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -253,7 +251,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting new user {0} {1}", e.Message,
+                Program.WriteError("\nError getting new user {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
             // should only find one user with the specified UPN
@@ -320,7 +318,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting user's manager and reports {0} {1}", e.Message,
+                Program.WriteError("\nError getting user's manager and reports {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -351,7 +349,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting Signed in user's groups and roles memberships. {0} {1}", e.Message,
+                Program.WriteError("\nError getting Signed in user's groups and roles memberships. {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
             #endregion
@@ -387,7 +385,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError creating new user {0} {1}", e.Message,
+                    Program.WriteError("\nError creating new user {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -414,7 +412,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError Updating the user {0} {1}", e.Message,
+                    Program.WriteError("\nError Updating the user {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -443,7 +441,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError Updating the user {0} {1}", e.Message,
+                    Program.WriteError("\nError Updating the user {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -471,7 +469,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError assigning manager to user. {0} {1}", e.Message,
+                    Program.WriteError("\nError assigning manager to user. {0} {1}", e.Message,
                             e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -500,7 +498,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting Group {0} {1}",
+                Program.WriteError("\nError getting Group {0} {1}",
                     e.Message, e.InnerException != null ? e.InnerException.Message : "");
             }
             if (foundGroups != null && foundGroups.Count > 0)
@@ -531,7 +529,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError assigning member to group. {0} {1}",
+                    Program.WriteError("\nError assigning member to group. {0} {1}",
                         e.Message, e.InnerException != null ? e.InnerException.Message : "");
                 }
 
@@ -582,7 +580,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError getting groups' membership. {0} {1}",
+                    Program.WriteError("\nError getting groups' membership. {0} {1}",
                         e.Message, e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -603,7 +601,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nRemoving user from group failed {0} {1}", e.Message,
+                    Program.WriteError("\nError removing user from group {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -625,7 +623,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting Applications {0} {1}", e.Message,
+                Program.WriteError("\nError getting Applications {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
             if (skus != null)
@@ -669,7 +667,7 @@ namespace GraphConsoleAppV3
                                 }
                                 catch (Exception e)
                                 {
-                                    Console.WriteLine("\nLicense assingment failed {0} {1}", e.Message,
+                                    Program.WriteError("\nError Assigning License {0} {1}", e.Message,
                                         e.InnerException != null ? e.InnerException.Message : "");
                                 }
                             }
@@ -703,7 +701,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError creating new Group {0} {1}", e.Message,
+                Program.WriteError("\nError creating new Group {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -722,7 +720,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting Roles {0} {1}", e.Message,
+                Program.WriteError("\nError getting Roles {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -754,7 +752,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting Service Principal {0} {1}",
+                Program.WriteError("\nError getting Service Principal {0} {1}",
                     e.Message, e.InnerException != null ? e.InnerException.Message : "");
             }
             if (servicePrincipals != null)
@@ -790,7 +788,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting Applications {0} {1}", e.Message,
+                Program.WriteError("\nError getting Applications {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
             if (applications != null)
@@ -844,7 +842,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("Application Creation execption: {0} {1}", e.Message,
+                Program.WriteError("\nError ceating Application: {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -857,7 +855,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("Application owner addition execption: {0} {1}", e.Message,
+                Program.WriteError("\nError adding Application owner: {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -885,7 +883,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("Application owner check exception: {0} {1}", e.Message,
+                Program.WriteError("\nError checking Application owner: {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
             #endregion
@@ -908,7 +906,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Service Principal Creation execption: {0} {1}", e.Message,
+                    Program.WriteError("\nError Creating Service Principal: {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -945,7 +943,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError extending the user object {0} {1}", e.Message,
+                    Program.WriteError("\nError extending the user object {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             #endregion
@@ -970,7 +968,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError Updating the user object {0} {1}", e.Message,
+                    Program.WriteError("\nError Updating the user object {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
 
@@ -990,7 +988,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError Updating the user object {0} {1}", e.Message,
+                    Program.WriteError("\nError Updating the user object {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
 
@@ -1027,7 +1025,7 @@ namespace GraphConsoleAppV3
 
                 catch (Exception e)
                 {
-                    Console.WriteLine("Direct Permission Assignment failed: {0} {1}", e.Message,
+                    Program.WriteError("\nError Assigning Direct Permission: {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
 
@@ -1109,7 +1107,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Permission Creation exception: {0} {1}", e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError with Permission Creation: {0} {1}", e.Message, e.InnerException != null ? e.InnerException.Message : "");
                 }
 
                 // remove the oauth2 permission scope grant
@@ -1121,7 +1119,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Permission Creation exception: {0} {1}", e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError with Permission Creation: {0} {1}", e.Message, e.InnerException != null ? e.InnerException.Message : "");
                 }
 
                 try
@@ -1131,7 +1129,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Service principal Deletion execption: {0} {1}", e.Message,
+                    Program.WriteError("\nError with Service Principal deletion: {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
 
@@ -1151,7 +1149,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error: {0} {1}", e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError Getting Permissions: {0} {1}", e.Message, e.InnerException != null ? e.InnerException.Message : "");
             }
             if (permissions != null)
             {
@@ -1182,7 +1180,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Deleting User failed {0} {1}", e.Message,
+                    Program.WriteError("\nError Deleting User {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -1203,7 +1201,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Deleting Group failed {0} {1}", e.Message,
+                    Program.WriteError("\nError Deleting Group {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -1224,7 +1222,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Application Deletion execption: {0} {1}", e.Message,
+                    Program.WriteError("\nError deleting Application: {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
@@ -1262,7 +1260,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("Batch execution failed. : {0} {1}", e.Message,
+                Program.WriteError("\nError with batch execution. : {0} {1}", e.Message,
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
@@ -1328,7 +1326,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("\nError getting User {0} {1}", e.Message,
+                    Program.WriteError("\nError getting User {0} {1}", e.Message,
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
 
@@ -1354,7 +1352,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nError getting files or content {0} {1}",
+                Program.WriteError("\nError getting files or content {0} {1}",
                      e.Message, e.InnerException != null ? e.InnerException.Message : "");
             }
             #endregion

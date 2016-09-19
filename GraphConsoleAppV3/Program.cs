@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using System.CodeDom.Compiler;
 using System.Net;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,7 @@ using Microsoft.Azure.ActiveDirectory.GraphClient.Extensions;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Microsoft.Data;
 using System.Net.WebSockets;
+using System.Text;
 
 #endregion
 
@@ -41,18 +43,20 @@ namespace GraphConsoleAppV3
                     break;
                 case 'b':
                     Console.WriteLine("\nRunning app-only mode, followed by user mode\n\n");
-                    var appModeTask2 = Task.Run(() => Requests.AppMode());
-                    appModeTask2.Wait();
+                    appModeTask = Task.Run(() => Requests.AppMode());
+                    appModeTask.Wait();
                     var userModeTask = Task.Run(() => Requests.UserMode());
                     userModeTask.Wait();
                     break;
                 case 'u':
                     Console.WriteLine("\nRunning in user mode\n\n");
-                    var userModeTask2 = Task.Run(() => Requests.UserMode());
-                    userModeTask2.Wait();
+                    userModeTask = Task.Run(() => Requests.UserMode());
+                    userModeTask.Wait();
                     break;
                 default:
-                    Console.WriteLine("\nSelection not recognized. Running in user mode\n\n");
+                    WriteError("\nSelection not recognized. Running in user mode\n\n");
+                    userModeTask = Task.Run(() => Requests.UserMode());
+                    userModeTask.Wait();
                     break;
             }
 
@@ -62,6 +66,13 @@ namespace GraphConsoleAppV3
 
             Console.WriteLine("\nCompleted at {0} \n Press Any Key to Exit.", currentDateTime);
             Console.ReadKey();
+        }
+
+        public static void WriteError(string output, params object[] args)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine(output, args);
+            Console.ResetColor();
         }
     }
 }

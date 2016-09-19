@@ -2,8 +2,8 @@
 {
     internal class Constants
     {
-        public const string TenantNameAppOnly = "GraphDir1.onMicrosoft.com";
-        public const string TenantIdAppOnly = "4fd2b2f2-ea27-4fe5-a8f3-7b1a7c975f34";
+        public const string TenantNameAppOnly = "calvliTest.onMicrosoft.com";
+        public const string TenantIdAppOnly = "2ea86d85-3149-476d-bd4a-1cc746ef2f01";
         public const string ClientId = "a7ec6203-e14c-43c9-9369-c044476a3be0";
         public const string ClientSecret = "eeveaj0RSnQRheEdzVDqQcOAAibL1oJxJs7zhgMCypQ=";
         //public const string ClientIdForUserAuthn = "66133929-66a4-4edc-aaee-13b04b03207d";
