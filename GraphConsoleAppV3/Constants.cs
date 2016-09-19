@@ -19,7 +19,7 @@
         //public const string ClientId = "27dd62a3-ba34-4833-b5c4-5698457436c1";
         //public const string ClientSecret = "moERmT+kyQDJio17R4Gb+TINZ2byJtqZ27slxdcryCs=";
         //public const string ClientIdForUserAuthn = "a211bee5-17a5-41d0-83be-d02c51536a3e";
-        public const string ClientIdForUserAuthn = "2e90cc6b-df6e-4dd0-92d4-77cddc3b9488";
+        public const string ClientIdForUserAuthn = "e99fe685-a49f-44af-91cc-7c67d9f73fe1";
         public const string ClientSecretForUserAuthn = "moERmT+kyQDJio17R4Gb+TINZ2byJtqZ27slxdcryCs=";
         public const string AuthString = "https://login.microsoftonline.com/common";
         public const string ResourceUrl = "https://graph.windows.net";

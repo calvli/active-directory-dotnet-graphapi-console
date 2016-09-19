@@ -170,7 +170,7 @@ namespace GraphConsoleAppV3
                     IUser sUser = (IUser)signedInUser;
 
                     //TODO - update with allowed art and save locally with project
-                    FileStream fileStream = new FileStream(@"C:\Users\dkershaw\Pictures\cute-cartoon-airplane.jpg", FileMode.Open, FileAccess.Read);
+                    FileStream fileStream = new FileStream(@"C:\Users\CALVLI\Pictures\profile.PNG", FileMode.Open, FileAccess.Read);
                     try
                     {
                         await sUser.ThumbnailPhoto.UploadAsync((Stream)fileStream, "application/image");
