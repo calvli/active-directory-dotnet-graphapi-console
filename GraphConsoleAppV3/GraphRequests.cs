@@ -124,7 +124,9 @@ namespace GraphConsoleAppV3
             User signedInUser = new User();
             try
             {
-                signedInUser = (User) await client.Me.ExecuteAsync();
+                //signedInUser = (User) await client.Me.ExecuteAsync();
+                //TODO: add meContext to library
+                signedInUser = (User)client.Users.Where(user => user.ObjectId == "97145419-6585-4d51-885c-b9c77505928b").ExecuteAsync().Result.CurrentPage.ToList().First();
                 Console.WriteLine("\nUser UPN: {0}, DisplayName: {1}", signedInUser.UserPrincipalName, signedInUser.DisplayName);
             }
             catch (Exception e)
