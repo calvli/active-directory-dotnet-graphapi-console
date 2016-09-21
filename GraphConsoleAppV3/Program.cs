@@ -38,25 +38,20 @@ namespace GraphConsoleAppV3
             {
                 case 'a':
                     Console.WriteLine("\nRunning app-only mode\n\n");
-                    var appModeTask = Task.Run(() => Requests.AppMode());
-                    appModeTask.Wait();
+                    Requests.AppMode().Wait();
                     break;
                 case 'b':
                     Console.WriteLine("\nRunning app-only mode, followed by user mode\n\n");
-                    appModeTask = Task.Run(() => Requests.AppMode());
-                    appModeTask.Wait();
-                    var userModeTask = Task.Run(() => Requests.UserMode());
-                    userModeTask.Wait();
+                    Requests.AppMode().Wait();
+                    Requests.UserMode().Wait();
                     break;
                 case 'u':
                     Console.WriteLine("\nRunning in user mode\n\n");
-                    userModeTask = Task.Run(() => Requests.UserMode());
-                    userModeTask.Wait();
+                    Requests.UserMode().Wait();
                     break;
                 default:
                     WriteError("\nSelection not recognized. Running in user mode\n\n");
-                    userModeTask = Task.Run(() => Requests.UserMode());
-                    userModeTask.Wait();
+                    Requests.UserMode().Wait();
                     break;
             }
 
