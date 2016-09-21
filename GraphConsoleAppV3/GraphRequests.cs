@@ -10,6 +10,7 @@ using Microsoft.Azure.ActiveDirectory.GraphClient;
 using Microsoft.Azure.ActiveDirectory.GraphClient.Extensions;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using System.Net.WebSockets;
+using System.Security.Policy;
 using Microsoft.Data.OData;
 using Microsoft.Data.Edm;
 using Microsoft.Data.Spatial;
@@ -124,9 +125,7 @@ namespace GraphConsoleAppV3
             User signedInUser = new User();
             try
             {
-                //signedInUser = (User) await client.Me.ExecuteAsync();
-                //TODO: add meContext to library
-                signedInUser = (User)client.Users.Where(user => user.ObjectId == "97145419-6585-4d51-885c-b9c77505928b").ExecuteAsync().Result.CurrentPage.ToList().First();
+                signedInUser = (User) await client.Me.ExecuteAsync();
                 Console.WriteLine("\nUser UPN: {0}, DisplayName: {1}", signedInUser.UserPrincipalName, signedInUser.DisplayName);
             }
             catch (Exception e)
@@ -1168,6 +1167,50 @@ namespace GraphConsoleAppV3
 
             #endregion
 
+            #region Domain Operations
+            #region List all Domains
+            //*********************************************************************************************
+            // get all Domains
+            //*********************************************************************************************
+            Console.WriteLine("\n Getting Domains");
+            IPagedCollection<IDomain> domains = null;
+            try
+            {
+                domains = await client.Domains.ExecuteAsync();
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError Getting Domains: {0} {1}", e.Message,
+                    e.InnerException != null ? e.InnerException.Message : "");
+            }
+            while (domains != null)
+            {
+                List<IDomain> domainList = domains.CurrentPage.ToList();
+                foreach (IDomain domain in domainList)
+                {
+                    Console.WriteLine("Domain: {0}  Verified: {1}", domain.Name, domain.IsVerified);
+                }
+                domains = await domains.GetNextPageAsync();
+            }
+            #endregion
+
+            #region Create new Domain
+
+            IDomain newDomain = new Domain { Name = Helper.GetRandomString() + ".com" };
+            newDomain.IsVerified = true;
+            try
+            {
+                await client.Domains.AddDomainAsync(newDomain);
+                Console.WriteLine("\nNew Domain {0} was created", newDomain.Name);
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError creating new Domain {0} : {1}", e.Message,
+                    e.InnerException != null ? e.InnerException.Message : null);
+            }
+            #endregion
+            #endregion
+
             #region CleanUp
             #region Delete the new user
             //*********************************************************************************************
@@ -1229,6 +1272,24 @@ namespace GraphConsoleAppV3
                 }
             }
 
+            #endregion
+
+            #region Delete Domain
+            //*********************************************************************************************
+            // Delete Domain we created
+            //*********************************************************************************************
+            if (newDomain.Name != null)
+            {
+                try
+                {
+                    await newDomain.DeleteAsync();
+                }
+                catch (Exception e)
+                {
+                    Program.WriteError("\nError deleting Domain: {0} {1}", e.Message,
+                        e.InnerException != null ? e.InnerException.Message : "");
+                }
+            }
             #endregion
             #endregion
 
