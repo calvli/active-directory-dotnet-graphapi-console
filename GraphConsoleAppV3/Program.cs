@@ -1,18 +1,7 @@
 ﻿#region
 
 using System;
-using System.CodeDom.Compiler;
 using System.Net;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
-using System.Threading.Tasks;
-using Microsoft.Azure.ActiveDirectory.GraphClient;
-using Microsoft.Azure.ActiveDirectory.GraphClient.Extensions;
-using Microsoft.IdentityModel.Clients.ActiveDirectory;
-using Microsoft.Data;
-using System.Net.WebSockets;
-using System.Text;
 
 #endregion
 
@@ -25,9 +14,6 @@ namespace GraphConsoleAppV3
         [STAThread]
         private static void Main()
         {
-            // record start DateTime of execution
-            string currentDateTime = DateTime.Now.ToUniversalTime().ToString();
-
             ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => true;
 
             Console.WriteLine("Run operations for signed-in user, or in app-only mode.\n");
@@ -59,7 +45,7 @@ namespace GraphConsoleAppV3
             // End of Demo Console App
             //*********************************************************************************************
 
-            Console.WriteLine("\nCompleted at {0} \n Press Any Key to Exit.", currentDateTime);
+            Console.WriteLine("\nCompleted at {0} \n Press Any Key to Exit.", DateTime.Now.ToUniversalTime());
             Console.ReadKey();
         }
 

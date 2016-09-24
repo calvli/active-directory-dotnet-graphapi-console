@@ -45,56 +45,62 @@ namespace GraphConsoleAppV3
 
             #endregion
 
-            Console.WriteLine("\nStarting user-mode requests...");
-            Console.WriteLine("\n=============================\n\n");
+            User newUser = new User();
+            Application newApp = new Application();
+            IDomain newDomain = new Domain();
+            Group newGroup = new Group();
+
+            try
+            {
+                Console.WriteLine("\nStarting user-mode requests...");
+                Console.WriteLine("\n=============================\n\n");
 
 
-            ITenantDetail tenantDetail = await GetTenantDetails(client);
-            User signedInUser = await GetSignedInUser(client);
-            await UpdateSignedInUsersPhoto(signedInUser);
+                ITenantDetail tenantDetail = await GetTenantDetails(client);
+                User signedInUser = await GetSignedInUser(client);
+                await UpdateSignedInUsersPhoto(signedInUser);
 
-            Console.WriteLine("\nSearching for any user based on UPN, DisplayName, First or Last Name");
-            Console.WriteLine("\nPlease enter the user's name you are looking for:");
-            string searchString = Console.ReadLine();
-            await PeoplePickerExample(client, searchString);
+                Console.WriteLine("\nSearching for any user based on UPN, DisplayName, First or Last Name");
+                Console.WriteLine("\nPlease enter the user's name you are looking for:");
+                string searchString = Console.ReadLine();
+                await PeoplePickerExample(client, searchString);
 
-            User retrievedUser = await SearchForUserByUpn(client,
-                searchString,
-                tenantDetail.VerifiedDomains.First(x => x.Initial.HasValue && x.Initial.Value));
+                await PrintUsersManager(signedInUser);
+                newUser = await CreateNewUser(client,
+                    tenantDetail.VerifiedDomains.First(x => x.@default.HasValue && x.@default.Value));
+                await UpdateNewUser(newUser);
+                await ResetUserPassword(newUser);
+                await OtherUserWriteOperations(client, newUser, signedInUser);
 
-            await PrintUsersManager(signedInUser);
-            IUser newUser = await CreateNewUser(client,
-                tenantDetail.VerifiedDomains.First(x => x.@default.HasValue && x.@default.Value));
-            await UpdateNewUser(newUser);
-            await ResetUserPassword(newUser);
-            await OtherUserWriteOperations(client, newUser, signedInUser);
+                newGroup = await CreateNewGroup(client);
+                await PrintAllRoles(client, searchString);
+                await PrintServicePrincipals(client);
 
-            Group newGroup = await CreateNewGroup(client);
-            await PrintAllRoles(client, searchString);
-            await PrintServicePrincipals(client);
+                await PrintApplications(client);
+                newApp = await CreateNewApplication(client, newUser);
+                ServicePrincipal newServicePrincipal = await CreateServicePrincipal(client, newApp);
+                string extName = "linkedInUserId";
+                await CreateSchemaExtensions(client, newApp, extName);
+                await ManipulateExtensionProperty(newApp, extName, newUser);
+                PrintExtensionProperty(newUser, extName);
+                await AssignAppRole(client, newApp, newServicePrincipal);
 
-            await PrintApplications(client);
-            Application newApp = await CreateNewApplication(client, newUser);
-            ServicePrincipal newServicePrincipal = await CreateServicePrincipal(client, newApp);
-            string extName = "linkedInUserId";
-            await CreateSchemaExtensions(client, newApp, extName);
-            await ManipulateExtensionProperty(client, newApp, extName, retrievedUser);
-            PrintExtensionProperty(retrievedUser, extName);
-            await AssignAppRole(client, newApp, newServicePrincipal);
+                await PrintDevices(client);
+                await CreateOAuth2Permission(client, newServicePrincipal);
+                await PrintAllPermissions(client);
 
-            await PrintDevices(client);
-            await CreateOAuth2Permission(client, newServicePrincipal);
-            await PrintAllPermissions(client);
+                await PrintAllDomains(client);
+                newDomain = await CreateNewDomain(client);
 
-            await PrintAllDomains(client);
-            IDomain newDomain = await CreateNewDomain(client);
-
-            await DeleteUser(newUser);
-            await DeleteApplication(newApp);
-            await DeleteDomain(newDomain);
-            await DeleteGroup(newGroup);
-
-            await BatchOps(client);
+                await BatchOps(client);
+            }
+            finally
+            {
+                DeleteUser(newUser).Wait();
+                DeleteApplication(newApp).Wait();
+                DeleteDomain(newDomain).Wait();
+                DeleteGroup(newGroup).Wait();
+            }
         }
 
         public static async Task AppMode()
@@ -263,13 +269,15 @@ namespace GraphConsoleAppV3
 
                 if (update != null && update.Equals("yes"))
                 {
-
-                    //TODO - update with allowed art and save locally with project
-                    FileStream fileStream = new FileStream(@"C:\Users\CALVLI\Pictures\profile.PNG", FileMode.Open,
-                        FileAccess.Read);
                     try
                     {
-                        await ((IUser)signedInUser).ThumbnailPhoto.UploadAsync(fileStream, "application/image");
+                        Console.WriteLine("\nSpecify path of photo:");
+                        string photo = Console.ReadLine();
+                        //TODO - update with allowed art and save locally with project
+                        FileStream fileStream = new FileStream(photo.Trim('"'), FileMode.Open,
+                            FileAccess.Read);
+
+                        await signedInUser.ThumbnailPhoto.UploadAsync(fileStream, "application/image");
                         Console.WriteLine("\nUser {0} was updated with a thumbnailphoto", signedInUser.DisplayName);
                     }
                     catch (Exception e)
@@ -301,10 +309,10 @@ namespace GraphConsoleAppV3
             {
                 IUserCollection userCollection = client.Users;
                 searchResults = await userCollection.Where(user =>
-                    user.UserPrincipalName.StartsWith(searchString) ||
-                    user.DisplayName.StartsWith(searchString) ||
-                    user.GivenName.StartsWith(searchString) ||
-                    user.Surname.StartsWith(searchString)).Take(10).ExecuteAsync();
+                    user.UserPrincipalName.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase) ||
+                    user.DisplayName.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase) ||
+                    user.GivenName.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase) ||
+                    user.Surname.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase)).Take(10).ExecuteAsync();
                 usersList = searchResults.CurrentPage.ToList();
             }
             catch (Exception e)
@@ -317,13 +325,13 @@ namespace GraphConsoleAppV3
             {
                 do
                 {
-                    int j = 1;
+                    int index = 1;
                     usersList = searchResults.CurrentPage.ToList();
                     foreach (IUser user in usersList)
                     {
-                        Console.WriteLine("User {2} DisplayName: {0}  UPN: {1}",
-                            user.DisplayName, user.UserPrincipalName, j);
-                        j++;
+                        Console.WriteLine("User {0} DisplayName: {1}  UPN: {2}",
+                            index, user.DisplayName, user.UserPrincipalName);
+                        index++;
                     }
                     searchResults = await searchResults.GetNextPageAsync();
                 } while (searchResults != null);
@@ -332,44 +340,6 @@ namespace GraphConsoleAppV3
             {
                 Console.WriteLine("User not found");
             }
-
-            #endregion
-        }
-
-        private static async Task<User> SearchForUserByUpn(
-            IActiveDirectoryClient client,
-            string searchString,
-            VerifiedDomain initialDomain)
-        {
-            #region Search for user by UPN
-
-            // search for a single user by UPN - the admin user
-            searchString = "admin@" + initialDomain.Name;
-            Console.WriteLine("\n Retrieving user with UPN {0}", searchString);
-            User retrievedUser = new User();
-            List<IUser> retrievedUsers = null;
-            try
-            {
-                IPagedCollection<IUser> userCollection = await client.Users
-                    .Where(user => user.UserPrincipalName.Equals(searchString))
-                    .ExecuteAsync();
-                retrievedUsers = userCollection.CurrentPage.ToList();
-            }
-            catch (Exception e)
-            {
-                Program.WriteError("\nError getting new user {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
-            }
-            // should only find one user with the specified UPN
-            if (retrievedUsers != null && retrievedUsers.Count == 1)
-            {
-                retrievedUser = (User) retrievedUsers.First();
-            }
-            else
-            {
-                Console.WriteLine("User not found {0}", searchString);
-            }
-            return retrievedUser;
 
             #endregion
         }
@@ -402,7 +372,7 @@ namespace GraphConsoleAppV3
                 }
                 else
                 {
-                    Console.WriteLine("\n  Manager:  No manager :)");
+                    Console.WriteLine("\n  User has no manager :)");
                 }
 
                 if (reports != null)
@@ -468,7 +438,7 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static async Task<IUser> CreateNewUser(IActiveDirectoryClient client, VerifiedDomain defaultDomain)
+        private static async Task<User> CreateNewUser(IActiveDirectoryClient client, VerifiedDomain defaultDomain)
         {
             #region Create a new User
 
@@ -477,7 +447,7 @@ namespace GraphConsoleAppV3
             // must be a privileged user (like a company or user admin)
             // **********************************************************
 
-            IUser newUser = new User();
+            User newUser = new User();
             if (defaultDomain.Name != null)
             {
                 Console.WriteLine("\nCreating a new user...");
@@ -1127,8 +1097,7 @@ namespace GraphConsoleAppV3
             }
         }
 
-        private static async Task ManipulateExtensionProperty(IActiveDirectoryClient client,
-            Application newApp, string extName, User retrievedUser)
+        private static async Task ManipulateExtensionProperty(Application newApp, string extName, User newUser)
         {
             #region Manipulate an Extension Property
 
@@ -1136,17 +1105,15 @@ namespace GraphConsoleAppV3
             // Update an extension property that exists on the user entity
             // **************************************************************************************************
 
-            // TODO - need to fix manipulating and getting extension value.
-
             // create the extension attribute name, for the extension that we just created
             string attributeName = "extension_" + newApp.AppId + "_" + extName;
             try
             {
-                if (retrievedUser != null && retrievedUser.ObjectId != null)
+                if (newUser != null && newUser.ObjectId != null)
                 {
-                    retrievedUser.SetExtendedProperty(attributeName, "user@linkedin.com");
-                    await retrievedUser.UpdateAsync();
-                    Console.WriteLine("\nUser {0}'s extended property set successully.", retrievedUser.DisplayName);
+                    newUser.SetExtendedProperty(attributeName, "user@linkedin.com");
+                    await newUser.UpdateAsync();
+                    Console.WriteLine("\nUser {0}'s extended property set successully.", newUser.DisplayName);
                 }
             }
             catch (Exception e)
@@ -1158,18 +1125,18 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static void PrintExtensionProperty(User retrievedUser, string attributeName)
+        private static void PrintExtensionProperty(User user, string attributeName)
         {
             #region Get an Extension Property
 
             try
             {
-                if (retrievedUser != null && retrievedUser.ObjectId != null)
+                if (user != null && user.ObjectId != null)
                 {
-                    IReadOnlyDictionary<string, object> extendedProperties = retrievedUser.GetExtendedProperties();
+                    IReadOnlyDictionary<string, object> extendedProperties = user.GetExtendedProperties();
                     object extendedProperty = extendedProperties[attributeName];
                     Console.WriteLine("\n Retrieved User {0}'s extended property value is: {1}.",
-                        retrievedUser.DisplayName,
+                        user.DisplayName,
                         extendedProperty);
                 }
             }
