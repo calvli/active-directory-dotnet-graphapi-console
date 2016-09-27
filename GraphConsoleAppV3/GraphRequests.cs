@@ -1,13 +1,13 @@
 ﻿#region
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
-using System.Threading.Tasks;
-using System.Data.Services.Client;
 using Microsoft.Azure.ActiveDirectory.GraphClient;
 using Microsoft.Azure.ActiveDirectory.GraphClient.Extensions;
+using System;
+using System.Collections.Generic;
+using System.Data.Services.Client;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 #endregion
 
@@ -32,13 +32,8 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("Acquiring a token failed with the following error: {0}", e.Message);
-                if (e.InnerException != null)
-                {
+                Program.WriteError("Acquiring a token failed with the following error: {0}", Program.ExtractErrorMessage(e));
                     //TODO: Implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
-                    //InnerException Message will contain the HTTP error status codes mentioned in the link above
-                    Program.WriteError("Error detail: {0}", e.InnerException.Message);
-                }
                 Console.ReadKey();
                 return;
             }
@@ -66,11 +61,13 @@ namespace GraphConsoleAppV3
                 await PeoplePickerExample(client, searchString);
 
                 await PrintUsersManager(signedInUser);
+                await PrintUsersGroupsAndRoles(signedInUser);
                 newUser = await CreateNewUser(client,
                     tenantDetail.VerifiedDomains.First(x => x.@default.HasValue && x.@default.Value));
                 await UpdateNewUser(newUser);
                 await ResetUserPassword(newUser);
-                await OtherUserWriteOperations(client, newUser, signedInUser);
+                await AssignManager(newUser, signedInUser);
+                await UserGroupOperations(client, newUser);
 
                 newGroup = await CreateNewGroup(client);
                 await PrintAllRoles(client, searchString);
@@ -264,7 +261,7 @@ namespace GraphConsoleAppV3
             // Directory.ReadWrite.All or Directory.AccessAsUser.All
             if (signedInUser.ObjectId != null)
             {
-                Console.WriteLine("\nDo you want to update your thumbnail photo with a default icon? yes/no\n");
+                Console.WriteLine("\nDo you want to update your thumbnail photo? yes/no\n");
                 string update = Console.ReadLine();
 
                 if (update != null && update.Equals("yes"))
@@ -344,7 +341,7 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static async Task PrintUsersManager( User user)
+        private static async Task PrintUsersManager(User user)
         {
             #region Get user's manager and direct reports, group memberships and role memberships
 
@@ -378,24 +375,30 @@ namespace GraphConsoleAppV3
                 if (reports != null)
                 {
                     Console.WriteLine("\n  Direct reports:");
-                }
-                do
-                {
-                    List<IDirectoryObject> directoryObjects = reports.CurrentPage.ToList();
-                    foreach (IDirectoryObject directoryObject in directoryObjects)
-                    {
-                        if (directoryObject is User)
-                        {
-                            Console.WriteLine("\n    " + ((IUser) (manager)).DisplayName);
-                        }
-                        else if (directoryObject is Contact)
-                        {
-                            Console.WriteLine("\n    " + ((IContact) (manager)).DisplayName);
-                        }
 
-                    }
-                    reports = await reports.GetNextPageAsync();
-                } while (reports != null);
+                    do
+                    {
+                        List<IDirectoryObject> directoryObjects = reports.CurrentPage.ToList();
+                        foreach (IDirectoryObject directoryObject in directoryObjects)
+                        {
+                            if (directoryObject is User)
+                            {
+                                Console.WriteLine("\n    " + ((IUser) (manager)).DisplayName);
+                            }
+                            else if (directoryObject is Contact)
+                            {
+                                Console.WriteLine("\n    " + ((IContact) (manager)).DisplayName);
+                            }
+
+                        }
+                        reports = await reports.GetNextPageAsync();
+                    } while (reports != null);
+                }
+
+                else
+                {
+                    Console.WriteLine("\n User has no direct reports");
+                }
             }
             catch (Exception e)
             {
@@ -403,7 +406,12 @@ namespace GraphConsoleAppV3
                     e.InnerException != null ? e.InnerException.Message : "");
             }
 
-            // group and role memberships
+            #endregion
+        }
+
+        private static async Task PrintUsersGroupsAndRoles(User user)
+        {
+            #region Get group and role memberships
             Console.WriteLine("\n Signed in user {0} is a member of the following Group and Roles (IDs)",
                 user.DisplayName);
             IUserFetcher signedInUserFetcher = user;
@@ -500,7 +508,11 @@ namespace GraphConsoleAppV3
                 try
                 {
                     await newUser.UpdateAsync();
-                    Console.WriteLine("\nUser {0} was updated", newUser.DisplayName);
+                    Console.WriteLine("\nUser {0} was updated:", newUser.DisplayName);
+                    Console.WriteLine("\t{0}:\t{1}", "City", "Seattle");
+                    Console.WriteLine("\t{0}:\t{1}", "Country", "UK");
+                    Console.WriteLine("\t{0}:\t{1}", "Mobile", "+4477889456789");
+                    Console.WriteLine("\t{0}:\t{1}", "Type", "Member");
                 }
                 catch (Exception e)
                 {
@@ -545,11 +557,9 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static async Task OtherUserWriteOperations(IActiveDirectoryClient client, IUser newUser,
+        private static async Task AssignManager(IUser newUser,
             IUser signedInUser)
         {
-            #region Other user write operations on a newly created user
-
             // *************************************************************
             // These operations require more privileged permissions like Directory.ReadWrite.All or Directory.AccessAsUser.All
             // Update signed in user's manager, update group membership
@@ -560,14 +570,13 @@ namespace GraphConsoleAppV3
             // Assign the newly created user a new manager (the signed in user).
             if (newUser.ObjectId != null)
             {
-                Console.WriteLine("\n Assign User {0}, {1} as Manager.", signedInUser.DisplayName,
+                Console.WriteLine("\n Assigning {0} as {1}'s Manager.", signedInUser.DisplayName,
                     newUser.DisplayName);
                 newUser.Manager = signedInUser as DirectoryObject;
                 try
                 {
                     await newUser.UpdateAsync();
-                    Console.Write("User {1} is successfully assigned {0} as their Manager.", signedInUser.DisplayName,
-                        newUser.DisplayName);
+                    Console.Write("Manager assignment successful.");
                 }
                 catch (Exception e)
                 {
@@ -575,10 +584,11 @@ namespace GraphConsoleAppV3
                         e.InnerException != null ? e.InnerException.Message : "");
                 }
             }
-            else
-                Console.WriteLine("\n Assigning manager failed, because new user was not created.");
-
             #endregion
+        }
+
+        private static async Task UserGroupOperations(IActiveDirectoryClient client, IUser newUser)
+        {
 
             #region Add the new user to a selected group
 
@@ -588,7 +598,7 @@ namespace GraphConsoleAppV3
             // Search for a group using a startsWith filter (displayName property)
             //*********************************************************************
             Group retrievedGroup = new Group();
-            Console.WriteLine("\nSearch for a group to add the current user to:");
+            Console.WriteLine("\nSearch for a group, by name, to add the current user to:");
             string groupName = Console.ReadLine();
 
             List<IGroup> foundGroups = null;
@@ -605,7 +615,7 @@ namespace GraphConsoleAppV3
                     e.Message, e.InnerException != null ? e.InnerException.Message : "");
             }
             if (foundGroups != null && foundGroups.Count > 0)
-            {            
+            {
                 int pickedGroupIndex = default(int);
 
                 if (foundGroups.Count == 1)
@@ -633,7 +643,7 @@ namespace GraphConsoleAppV3
                 {
                     try
                     {
-                        retrievedGroup = (Group)foundGroups[pickedGroupIndex];
+                        retrievedGroup = (Group) foundGroups[pickedGroupIndex];
                         retrievedGroup.Members.Add(newUser as DirectoryObject);
                         await retrievedGroup.UpdateAsync();
                     }
@@ -646,7 +656,7 @@ namespace GraphConsoleAppV3
             }
             else
             {
-                Console.WriteLine("Group Not Found based on search criteria, and hence user not added to group");
+                Console.WriteLine("Group not Found based on search criteria, and hence user not added to group");
             }
 
             #endregion
@@ -703,7 +713,7 @@ namespace GraphConsoleAppV3
 
             #endregion
 
-            #region Remove new user from the  group
+            #region Remove new user from the group
 
             //*********************************************************************************************
             // Delete user from the earlier selected Group 
@@ -792,8 +802,6 @@ namespace GraphConsoleAppV3
                     skus = await skus.GetNextPageAsync();
                 } while (skus != null);
             }
-
-            #endregion
 
             #endregion
         }

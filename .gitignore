@@ -6,5 +6,4 @@ packages/*
 .nuget/*
 *.suo
 *.DotSettings*
-GraphConsoleAppV3/Constants.cs 
 GraphConsoleAppV3/Program-old.cs

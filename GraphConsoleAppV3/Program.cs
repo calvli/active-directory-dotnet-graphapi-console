@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using System.Collections.Generic;
 using System.Net;
 
 #endregion
@@ -47,6 +48,19 @@ namespace GraphConsoleAppV3
 
             Console.WriteLine("\nCompleted at {0} \n Press Any Key to Exit.", DateTime.Now.ToUniversalTime());
             Console.ReadKey();
+        }
+
+        public static string ExtractErrorMessage(Exception exception)
+        {
+            List<string> errorMessages = new List<string>();
+            string tabs = "";
+            while (exception != null)
+            {
+                errorMessages.Add(tabs + exception.Message);
+                exception = exception.InnerException;
+                tabs += '\t';
+            }
+            return string.Join(":\n", errorMessages);
         }
 
         public static void WriteError(string output, params object[] args)
