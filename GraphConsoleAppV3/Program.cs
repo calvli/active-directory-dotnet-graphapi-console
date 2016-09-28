@@ -53,14 +53,14 @@ namespace GraphConsoleAppV3
         public static string ExtractErrorMessage(Exception exception)
         {
             List<string> errorMessages = new List<string>();
-            string tabs = "";
+            string tabs = "\n";
             while (exception != null)
             {
+                tabs += "    ";
                 errorMessages.Add(tabs + exception.Message);
                 exception = exception.InnerException;
-                tabs += '\t';
             }
-            return string.Join(":\n", errorMessages);
+            return string.Join("-\n", errorMessages);
         }
 
         public static void WriteError(string output, params object[] args)

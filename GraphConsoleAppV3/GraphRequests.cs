@@ -15,8 +15,6 @@ namespace GraphConsoleAppV3
 {
     internal class Requests
     {
-        private static string _graphAppObjectId;
-
         public static async Task UserMode()
         {
             #region Setup Graph client for user
@@ -32,8 +30,9 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("Acquiring a token failed with the following error: {0}", Program.ExtractErrorMessage(e));
-                    //TODO: Implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
+                Program.WriteError("Acquiring a token failed with the following error: {0}",
+                    Program.ExtractErrorMessage(e));
+                //TODO: Implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
                 Console.ReadKey();
                 return;
             }
@@ -44,6 +43,9 @@ namespace GraphConsoleAppV3
             Application newApp = new Application();
             IDomain newDomain = new Domain();
             Group newGroup = new Group();
+            ExtensionProperty newExtension = new ExtensionProperty();
+            ServicePrincipal newServicePrincipal = new ServicePrincipal();
+            OAuth2PermissionGrant newPermissionGrant = new OAuth2PermissionGrant();
 
             try
             {
@@ -57,11 +59,12 @@ namespace GraphConsoleAppV3
 
                 Console.WriteLine("\nSearching for any user based on UPN, DisplayName, First or Last Name");
                 Console.WriteLine("\nPlease enter the user's name you are looking for:");
+
                 string searchString = Console.ReadLine();
                 await PeoplePickerExample(client, searchString);
-
                 await PrintUsersManager(signedInUser);
                 await PrintUsersGroupsAndRoles(signedInUser);
+
                 newUser = await CreateNewUser(client,
                     tenantDetail.VerifiedDomains.First(x => x.@default.HasValue && x.@default.Value));
                 await UpdateNewUser(newUser);
@@ -72,31 +75,33 @@ namespace GraphConsoleAppV3
                 newGroup = await CreateNewGroup(client);
                 await PrintAllRoles(client, searchString);
                 await PrintServicePrincipals(client);
-
                 await PrintApplications(client);
-                newApp = await CreateNewApplication(client, newUser);
-                ServicePrincipal newServicePrincipal = await CreateServicePrincipal(client, newApp);
-                string extName = "linkedInUserId";
-                await CreateSchemaExtensions(client, newApp, extName);
-                await ManipulateExtensionProperty(newApp, extName, newUser);
-                PrintExtensionProperty(newUser, extName);
-                await AssignAppRole(client, newApp, newServicePrincipal);
 
-                await PrintDevices(client);
-                await CreateOAuth2Permission(client, newServicePrincipal);
+                string graphAppObjectId = await GetAppObjectId(client, Constants.GraphServiceObjectId);
+                newApp = await CreateNewApplication(client, newUser);
+                newServicePrincipal = await CreateServicePrincipal(client, newApp);
+                string extName = "linkedInUserId";
+                newExtension = await CreateSchemaExtensions(client, newApp, extName);
+                await ManipulateExtensionProperty(newExtension, newUser);
+                PrintExtensionProperty(newUser, newExtension);
+
+                await AssignAppRole(client, newApp, newServicePrincipal);
+                await PrintDevicesAndOwners(client);
+                newPermissionGrant = await CreateOAuth2Permission(client, newServicePrincipal, graphAppObjectId);
                 await PrintAllPermissions(client);
 
                 await PrintAllDomains(client);
                 newDomain = await CreateNewDomain(client);
 
-                await BatchOps(client);
+                await BatchOperations(client);
             }
             finally
             {
                 DeleteUser(newUser).Wait();
-                DeleteApplication(newApp).Wait();
                 DeleteDomain(newDomain).Wait();
                 DeleteGroup(newGroup).Wait();
+                DeleteServicePrincipalAndPermission(newServicePrincipal, newPermissionGrant).Wait();
+                DeleteApplication(newApp, newExtension).Wait();
             }
         }
 
@@ -112,20 +117,13 @@ namespace GraphConsoleAppV3
             {
                 client = AuthenticationHelper.GetActiveDirectoryClientAsApplication();
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Acquiring a token failed with the following error: {0}", ex.Message);
-                if (ex.InnerException != null)
-                {
-                    //You should implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
-                    //InnerException Message will contain the HTTP error status codes mentioned in the link above
-                    Console.WriteLine("Error detail: {0}", ex.InnerException.Message);
-                }
-                Console.ResetColor();
-                Console.ReadKey();
+                //TODO: Implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
+                Program.WriteError("Acquiring a token failed with the following error: {0}", Program.ExtractErrorMessage(e));
                 return;
             }
+
             #endregion
 
             Console.WriteLine("\nStarting app-mode requests...");
@@ -177,8 +175,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting TenantDetails {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting TenantDetails {0}", Program.ExtractErrorMessage(e));
             }
 
             if (tenant == null)
@@ -223,8 +220,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting signed in user {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting signed in user {0}", Program.ExtractErrorMessage(e));
             }
 
 
@@ -244,8 +240,8 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError getting the user's photo - may not exist {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError getting the user's photo - may not exist {0}",
+                        Program.ExtractErrorMessage(e));
                 }
             }
             return signedInUser;
@@ -279,8 +275,7 @@ namespace GraphConsoleAppV3
                     }
                     catch (Exception e)
                     {
-                        Program.WriteError("\nError Updating the user photo {0} {1}", e.Message,
-                            e.InnerException != null ? e.InnerException.Message : "");
+                        Program.WriteError("\nError Updating the user photo {0}", Program.ExtractErrorMessage(e));
                     }
                 }
             }
@@ -306,16 +301,15 @@ namespace GraphConsoleAppV3
             {
                 IUserCollection userCollection = client.Users;
                 searchResults = await userCollection.Where(user =>
-                    user.UserPrincipalName.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase) ||
-                    user.DisplayName.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase) ||
-                    user.GivenName.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase) ||
-                    user.Surname.StartsWith(searchString, StringComparison.CurrentCultureIgnoreCase)).Take(10).ExecuteAsync();
+                    user.UserPrincipalName.StartsWith(searchString) ||
+                    user.DisplayName.StartsWith(searchString) ||
+                    user.GivenName.StartsWith(searchString) ||
+                    user.Surname.StartsWith(searchString)).Take(10).ExecuteAsync();
                 usersList = searchResults.CurrentPage.ToList();
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting User {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting User {0}", Program.ExtractErrorMessage(e));
             }
 
             if (usersList != null && usersList.Count > 0)
@@ -402,8 +396,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting user's manager and reports {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting user's manager and reports {0}", Program.ExtractErrorMessage(e));
             }
 
             #endregion
@@ -412,6 +405,7 @@ namespace GraphConsoleAppV3
         private static async Task PrintUsersGroupsAndRoles(User user)
         {
             #region Get group and role memberships
+
             Console.WriteLine("\n Signed in user {0} is a member of the following Group and Roles (IDs)",
                 user.DisplayName);
             IUserFetcher signedInUserFetcher = user;
@@ -439,8 +433,8 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting Signed in user's groups and roles memberships. {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting Signed in user's groups and roles memberships. {0}",
+                    Program.ExtractErrorMessage(e));
             }
 
             #endregion
@@ -481,8 +475,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError creating new user {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError creating new user {0}", Program.ExtractErrorMessage(e));
                 }
             }
             return newUser;
@@ -516,8 +509,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError Updating the user {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError Updating the user {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
@@ -549,8 +541,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError Updating the user {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError Updating the user {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
@@ -580,10 +571,10 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError assigning manager to user. {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError assigning manager to user. {0}", Program.ExtractErrorMessage(e));
                 }
             }
+
             #endregion
         }
 
@@ -611,8 +602,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting Group {0} {1}",
-                    e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting Group {0}", e.Message, Program.ExtractErrorMessage(e));
             }
             if (foundGroups != null && foundGroups.Count > 0)
             {
@@ -649,8 +639,8 @@ namespace GraphConsoleAppV3
                     }
                     catch (Exception e)
                     {
-                        Program.WriteError("\nError assigning member to group. {0} {1}",
-                            e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                        Program.WriteError("\nError assigning member to group. {0}", e.Message,
+                            Program.ExtractErrorMessage(e));
                     }
                 }
             }
@@ -706,8 +696,8 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError getting groups' membership. {0} {1}",
-                        e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError getting groups' membership. {0}", e.Message,
+                        Program.ExtractErrorMessage(e));
                 }
             }
 
@@ -727,8 +717,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError removing user from group {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError removing user from group {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
@@ -749,8 +738,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting Applications {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting Applications {0}", Program.ExtractErrorMessage(e));
             }
             if (skus != null)
             {
@@ -793,8 +781,7 @@ namespace GraphConsoleAppV3
                                 }
                                 catch (Exception e)
                                 {
-                                    Program.WriteError("\nError Assigning License {0} {1}", e.Message,
-                                        e.InnerException != null ? e.InnerException.Message : "");
+                                    Program.WriteError("\nError Assigning License {0}", Program.ExtractErrorMessage(e));
                                 }
                             }
                         }
@@ -828,8 +815,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError creating new Group {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError creating new Group {0}", Program.ExtractErrorMessage(e));
             }
             return newGroup;
 
@@ -851,8 +837,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting Roles {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting Roles {0}", Program.ExtractErrorMessage(e));
             }
 
             if (foundRoles != null && foundRoles.Count > 0)
@@ -885,29 +870,48 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting Service Principal {0} {1}",
-                    e.Message, e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting Service Principal {0}", e.Message, Program.ExtractErrorMessage(e));
             }
-            if (servicePrincipals != null)
+            while (servicePrincipals != null)
             {
-                do
+                List<IServicePrincipal> servicePrincipalsList = servicePrincipals.CurrentPage.ToList();
+                foreach (IServicePrincipal servicePrincipal in servicePrincipalsList)
                 {
-                    List<IServicePrincipal> servicePrincipalsList = servicePrincipals.CurrentPage.ToList();
-                    foreach (IServicePrincipal servicePrincipal in servicePrincipalsList)
-                    {
-                        Console.WriteLine("Service Principal AppId: {0}  Name: {1}", servicePrincipal.AppId,
-                            servicePrincipal.DisplayName);
-                        // find the Graph API service principal objectId
-                        if (servicePrincipal.AppId == "00000002-0000-0000-c000-000000000000")
-                        {
-                            _graphAppObjectId = servicePrincipal.ObjectId;
-                        }
-                    }
-                    servicePrincipals = await servicePrincipals.GetNextPageAsync();
-                } while (servicePrincipals != null);
+                    Console.WriteLine("Service Principal AppId: {0}  Name: {1}", servicePrincipal.AppId,
+                        servicePrincipal.DisplayName);
+                }
+                servicePrincipals = await servicePrincipals.GetNextPageAsync();
             }
 
             #endregion
+        }
+
+        private static async Task<string> GetAppObjectId(IActiveDirectoryClient client, string servicePrincipalObjectId)
+        {
+            IPagedCollection<IServicePrincipal> servicePrincipals = null;
+            try
+            {
+                servicePrincipals = await client.ServicePrincipals.ExecuteAsync();
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError getting Service Principal {0}", e.Message, Program.ExtractErrorMessage(e));
+            }
+
+            while (servicePrincipals != null)
+            {
+                List<IServicePrincipal> servicePrincipalsList = servicePrincipals.CurrentPage.ToList();
+                IServicePrincipal servicePrincipal =
+                    servicePrincipalsList.FirstOrDefault(x => x.AppId.Equals(servicePrincipalObjectId));
+
+                if (servicePrincipal != null)
+                {
+                    return servicePrincipal.ObjectId;
+                }
+
+                servicePrincipals = await servicePrincipals.GetNextPageAsync();
+            }
+            return string.Empty;
         }
 
         private static async Task PrintApplications(IActiveDirectoryClient client)
@@ -924,8 +928,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError getting Applications {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError getting Applications {0}", Program.ExtractErrorMessage(e));
             }
             if (applications != null)
             {
@@ -981,8 +984,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError ceating Application: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError ceating Application: {0}", Program.ExtractErrorMessage(e));
             }
 
             // add an owner for the newly created application
@@ -994,8 +996,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError adding Application owner: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError adding Application owner: {0}", Program.ExtractErrorMessage(e));
             }
 
             // check the ownership for the newly created application
@@ -1023,45 +1024,44 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError checking Application owner: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError checking Application owner: {0}", Program.ExtractErrorMessage(e));
             }
             return newApp;
 
             #endregion
         }
 
-        private static async Task<ServicePrincipal> CreateServicePrincipal(IActiveDirectoryClient client, IApplication newApp)
+        private static async Task<ServicePrincipal> CreateServicePrincipal(IActiveDirectoryClient client,
+            IApplication newApp)
         {
             #region Create Service Principal
 
             //*********************************************************************************************
             // create a new Service principal, from the application object that was just created
             //*********************************************************************************************
-            ServicePrincipal newServicePrincpal = new ServicePrincipal();
+            ServicePrincipal newServicePrincipal = new ServicePrincipal();
             if (newApp.AppId != null)
             {
-                newServicePrincpal.DisplayName = newApp.DisplayName;
-                newServicePrincpal.AccountEnabled = true;
-                newServicePrincpal.AppId = newApp.AppId;
+                newServicePrincipal.DisplayName = newApp.DisplayName;
+                newServicePrincipal.AccountEnabled = true;
+                newServicePrincipal.AppId = newApp.AppId;
                 try
                 {
-                    await client.ServicePrincipals.AddServicePrincipalAsync(newServicePrincpal);
-                    Console.WriteLine("New Service Principal created: " + newServicePrincpal.DisplayName);
+                    await client.ServicePrincipals.AddServicePrincipalAsync(newServicePrincipal);
+                    Console.WriteLine("New Service Principal created: " + newServicePrincipal.DisplayName);
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError Creating Service Principal: {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError Creating Service Principal: {0}", Program.ExtractErrorMessage(e));
                 }
             }
-            return newServicePrincpal;
+            return newServicePrincipal;
 
             #endregion
         }
 
-        private static async Task<ExtensionProperty> CreateSchemaExtensions(IActiveDirectoryClient client, 
-            Application newApp, 
+        private static async Task<ExtensionProperty> CreateSchemaExtensions(IActiveDirectoryClient client,
+            Application newApp,
             string extName)
         {
             #region Create an Extension Property
@@ -1092,20 +1092,16 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError extending the user object {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError extending the user object {0}", Program.ExtractErrorMessage(e));
                 }
                 return linkedInUserId;
 
                 #endregion
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
-        private static async Task ManipulateExtensionProperty(Application newApp, string extName, User newUser)
+        private static async Task ManipulateExtensionProperty(ExtensionProperty newExtension, User newUser)
         {
             #region Manipulate an Extension Property
 
@@ -1114,52 +1110,47 @@ namespace GraphConsoleAppV3
             // **************************************************************************************************
 
             // create the extension attribute name, for the extension that we just created
-            string attributeName = "extension_" + newApp.AppId + "_" + extName;
             try
             {
-                if (newUser != null && newUser.ObjectId != null)
+                if (newExtension != null && newUser != null && newUser.ObjectId != null)
                 {
-                    newUser.SetExtendedProperty(attributeName, "user@linkedin.com");
+                    newUser.SetExtendedProperty(newExtension.Name, "user@linkedin.com");
                     await newUser.UpdateAsync();
                     Console.WriteLine("\nUser {0}'s extended property set successully.", newUser.DisplayName);
                 }
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError Updating the user object {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError Updating the user object {0}", Program.ExtractErrorMessage(e));
             }
 
             #endregion
         }
 
-        private static void PrintExtensionProperty(User user, string attributeName)
+        private static void PrintExtensionProperty(User user, ExtensionProperty newExtension)
         {
             #region Get an Extension Property
 
             try
             {
-                if (user != null && user.ObjectId != null)
+                if (newExtension != null && user != null && user.ObjectId != null)
                 {
-                    IReadOnlyDictionary<string, object> extendedProperties = user.GetExtendedProperties();
-                    object extendedProperty = extendedProperties[attributeName];
                     Console.WriteLine("\n Retrieved User {0}'s extended property value is: {1}.",
                         user.DisplayName,
-                        extendedProperty);
+                        newExtension);
                 }
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError Updating the user object {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError Updating the user object {0}", Program.ExtractErrorMessage(e));
             }
 
             #endregion
         }
 
-        private static async Task AssignAppRole(IActiveDirectoryClient client, 
-            Application newApp, 
-            ServicePrincipal newServicePrincpal)
+        private static async Task AssignAppRole(IActiveDirectoryClient client,
+            Application newApp,
+            ServicePrincipal newServicePrincipal)
         {
             #region Assign an app role
 
@@ -1167,12 +1158,12 @@ namespace GraphConsoleAppV3
             {
                 User user =
                     (User) (await client.Users.ExecuteAsync()).CurrentPage.ToList().FirstOrDefault();
-                if (newApp.ObjectId != null && user != null && newServicePrincpal.ObjectId != null)
+                if (newApp.ObjectId != null && user != null && newServicePrincipal.ObjectId != null)
                 {
                     // create the app role assignment
                     AppRoleAssignment appRoleAssignment = new AppRoleAssignment();
                     appRoleAssignment.Id = newApp.AppRoles.FirstOrDefault().Id;
-                    appRoleAssignment.ResourceId = Guid.Parse(newServicePrincpal.ObjectId);
+                    appRoleAssignment.ResourceId = Guid.Parse(newServicePrincipal.ObjectId);
                     appRoleAssignment.PrincipalType = "User";
                     appRoleAssignment.PrincipalId = Guid.Parse(user.ObjectId);
                     user.AppRoleAssignments.Add(appRoleAssignment);
@@ -1184,22 +1175,21 @@ namespace GraphConsoleAppV3
                     // remove the app role
                     user.AppRoleAssignments.Remove(appRoleAssignment);
                     await user.UpdateAsync();
-                    Console.WriteLine("User {0} is successfully UNassigned an app (role).", user.DisplayName);
+                    Console.WriteLine("User {0} is successfully removed from app (role).", user.DisplayName);
 
                 }
             }
 
             catch (Exception e)
             {
-                Program.WriteError("\nError Assigning Direct Permission: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError Assigning Direct Permission: {0}", Program.ExtractErrorMessage(e));
             }
 
         }
 
         #endregion
 
-        private static async Task PrintDevices(IActiveDirectoryClient client)
+        private static async Task PrintDevicesAndOwners(IActiveDirectoryClient client)
         {
             #region Get Devices
 
@@ -1214,8 +1204,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Console.WriteLine("/nError getting devices {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("/nError getting devices {0}", Program.ExtractErrorMessage(e));
             }
 
             if (devices != null)
@@ -1250,26 +1239,31 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static async Task CreateOAuth2Permission(IActiveDirectoryClient client, ServicePrincipal newServicePrincpal)
+        private static async Task<OAuth2PermissionGrant> CreateOAuth2Permission(
+            IActiveDirectoryClient client,
+            ServicePrincipal newServicePrincipal,
+            string graphAppObjectId)
         {
             #region Create a new consentable OAuth2 permission
 
             //*********************************************************************************************
             // Create new  oauth2 permission object
             //*********************************************************************************************
-            if (newServicePrincpal.ObjectId != null)
+            if (newServicePrincipal.ObjectId != null)
             {
-                OAuth2PermissionGrant permissionObject = new OAuth2PermissionGrant();
-                permissionObject.ConsentType = "AllPrincipals";
-                permissionObject.Scope = "user_impersonation";
-                permissionObject.StartTime = DateTime.Now;
-                permissionObject.ExpiryTime = (DateTime.Now).AddMonths(12);
+                OAuth2PermissionGrant permissionObject = new OAuth2PermissionGrant
+                {
+                    ConsentType = "AllPrincipals",
+                    Scope = "user_impersonation",
+                    StartTime = DateTime.Now,
+                    ExpiryTime = (DateTime.Now).AddMonths(12),
+                    ResourceId = graphAppObjectId,
+                    ClientId = newServicePrincipal.ObjectId
+                };
 
-                // resourceId is objectId of the resource, in this case objectId of AzureAd (Graph API)
-                permissionObject.ResourceId = _graphAppObjectId;
+                // AppId of AzureAd (Graph API)
 
                 //ClientId = objectId of servicePrincipal
-                permissionObject.ClientId = newServicePrincpal.ObjectId;
 
                 // add the oauth2 permission scope grant
                 try
@@ -1279,37 +1273,15 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError with Permission Creation: {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError with Permission Creation: {0}", Program.ExtractErrorMessage(e));
                 }
 
-                // remove the oauth2 permission scope grant
-                try
-                {
-                    newServicePrincpal.Oauth2PermissionGrants.Remove(permissionObject);
-                    await newServicePrincpal.UpdateAsync();
-                    Console.WriteLine("Removed Permission object: " + permissionObject.ObjectId);
-                }
-                catch (Exception e)
-                {
-                    Program.WriteError("\nError with Permission Creation: {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
-                }
-
-                try
-                {
-                    await newServicePrincpal.DeleteAsync();
-                    Console.WriteLine("Deleted service principal object: " + newServicePrincpal.ObjectId);
-                }
-                catch (Exception e)
-                {
-                    Program.WriteError("\nError with Service Principal deletion: {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
-                }
-
+                return permissionObject;
             }
 
             #endregion
+
+            return null;
         }
 
         private static async Task PrintAllPermissions(IActiveDirectoryClient client)
@@ -1327,8 +1299,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError Getting Permissions: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError Getting Permissions: {0}", Program.ExtractErrorMessage(e));
             }
             if (permissions != null)
             {
@@ -1363,8 +1334,7 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError Getting Domains: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError Getting Domains: {0}", Program.ExtractErrorMessage(e));
             }
             while (domains != null)
             {
@@ -1384,7 +1354,6 @@ namespace GraphConsoleAppV3
             #region Create new Domain
 
             IDomain newDomain = new Domain {Name = Helper.GetRandomString() + ".com"};
-            newDomain.IsVerified = true;
             try
             {
                 await client.Domains.AddDomainAsync(newDomain);
@@ -1392,13 +1361,13 @@ namespace GraphConsoleAppV3
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError creating new Domain {0} : {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : null);
+                Program.WriteError("\nError creating new Domain {0}", Program.ExtractErrorMessage(e));
             }
             return newDomain;
 
             #endregion
         }
+
         #endregion
 
         #region CleanUp
@@ -1419,8 +1388,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError Deleting User {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError Deleting User {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
@@ -1443,15 +1411,14 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError Deleting Group {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError Deleting Group {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
             #endregion
         }
 
-        private static async Task DeleteApplication(Application newApp)
+        private static async Task DeleteApplication(Application newApp, ExtensionProperty newExtension = null)
         {
             #region Delete Application
 
@@ -1462,17 +1429,59 @@ namespace GraphConsoleAppV3
             {
                 try
                 {
+                    if (newExtension != null)
+                    {
+                        try
+                        {
+                            newApp.ExtensionProperties.Remove(newExtension);
+                            Console.WriteLine("\nDeleted extension property: " + newExtension.Name);
+                        }
+                        catch (Exception e)
+                        {
+                            Program.WriteError("\nError deleting extension property: {0}",
+                                Program.ExtractErrorMessage(e));
+                        }
+                    }
                     await newApp.DeleteAsync();
                     Console.WriteLine("\nDeleted Application object: " + newApp.ObjectId);
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError deleting Application: {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError deleting Application: {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
             #endregion
+        }
+
+        private static async Task DeleteServicePrincipalAndPermission(
+            ServicePrincipal servicePrincipal, 
+            OAuth2PermissionGrant permissionGrant = null)
+        {
+            try
+            {
+                await servicePrincipal.DeleteAsync();
+                Console.WriteLine("Deleted service principal object: " + servicePrincipal.ObjectId);
+                // remove the oauth2 permission scope grant
+                try
+                {
+                    if (permissionGrant != null)
+                    {
+                        servicePrincipal.Oauth2PermissionGrants.Remove(permissionGrant);
+                        await servicePrincipal.UpdateAsync();
+                        Console.WriteLine("Removed Permission object: " + permissionGrant.ObjectId);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Program.WriteError("\nError with Permission Deletion: {0}", Program.ExtractErrorMessage(e));
+                }
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError with Service Principal deletion: {0} {1}", e.Message,
+                    e.InnerException != null ? e.InnerException.Message : "");
+            }
         }
 
         private static async Task DeleteDomain(IDomain newDomain)
@@ -1491,16 +1500,16 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError deleting Domain: {0} {1}", e.Message,
-                        e.InnerException != null ? e.InnerException.Message : "");
+                    Program.WriteError("\nError deleting Domain: {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
             #endregion
         }
+
         #endregion
 
-        private static async Task BatchOps(ActiveDirectoryClient client)
+        private static async Task BatchOperations(ActiveDirectoryClient client)
         {
             #region Batch Operations
 
@@ -1520,20 +1529,20 @@ namespace GraphConsoleAppV3
                 {
                     if (result.FailureResult != null)
                     {
-                        Console.WriteLine("Failed: {0} ",
-                            result.FailureResult.InnerException);
+                        Console.WriteLine("Batch Item Result {0} failed. Exception: {1} ",
+                            responseCount, result.FailureResult.InnerException);
                     }
-                    if (result.SuccessResult != null)
+                    else if (result.SuccessResult != null)
                     {
                         Console.WriteLine("Batch Item Result {0} succeeded",
-                            responseCount++);
+                            responseCount);
                     }
+                    responseCount++;
                 }
             }
             catch (Exception e)
             {
-                Program.WriteError("\nError with batch execution. : {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
+                Program.WriteError("\nError with batch execution. : {0}", Program.ExtractErrorMessage(e));
             }
 
             #endregion
