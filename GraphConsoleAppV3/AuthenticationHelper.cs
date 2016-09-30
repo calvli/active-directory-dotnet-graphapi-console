@@ -8,6 +8,20 @@ namespace GraphConsoleAppV3
     internal class AuthenticationHelper
     {
         public static string TokenForUser;
+        public static string TokenForApplication;
+
+        /// <summary>
+        /// Get Active Directory Client for Application.
+        /// </summary>
+        /// <returns>ActiveDirectoryClient for Application.</returns>
+        public static ActiveDirectoryClient GetActiveDirectoryClientAsApplication()
+        {
+            Uri servicePointUri = new Uri(GlobalConstants.ResourceUrl);
+            Uri serviceRoot = new Uri(servicePointUri, AppModeConstants.TenantId);
+            ActiveDirectoryClient activeDirectoryClient = new ActiveDirectoryClient(serviceRoot,
+                async () => await AcquireTokenAsyncForApplication());
+            return activeDirectoryClient;
+        }
 
         /// <summary>
         /// Async task to acquire token for Application.
@@ -24,25 +38,31 @@ namespace GraphConsoleAppV3
         /// <returns>Token for application.</returns>
         public static string GetTokenForApplication()
         {
-            AuthenticationContext authenticationContext = new AuthenticationContext(Constants.AuthStringAppOnly, false);
-            // Config for OAuth client credentials 
-            ClientCredential clientCred = new ClientCredential(Constants.ClientId, Constants.ClientSecret);
-            AuthenticationResult authenticationResult = authenticationContext.AcquireToken(Constants.ResourceUrl,
-                clientCred);
-            string token = authenticationResult.AccessToken;
-            return token;
+            if (TokenForApplication == null)
+            {
+                AuthenticationContext authenticationContext = new AuthenticationContext
+                    (GlobalConstants.AuthString + AppModeConstants.TenantName, false);
+                // Config for OAuth client credentials 
+                ClientCredential clientCred = new ClientCredential(AppModeConstants.ClientId,
+                    AppModeConstants.ClientSecret);
+                AuthenticationResult authenticationResult =
+                    authenticationContext.AcquireToken(GlobalConstants.ResourceUrl,
+                        clientCred);
+                TokenForApplication = authenticationResult.AccessToken;
+            }
+            return TokenForApplication;
         }
 
         /// <summary>
-        /// Get Active Directory Client for Application.
+        /// Get Active Directory Client for User.
         /// </summary>
-        /// <returns>ActiveDirectoryClient for Application.</returns>
-        public static ActiveDirectoryClient GetActiveDirectoryClientAsApplication()
+        /// <returns>ActiveDirectoryClient for User.</returns>
+        public static ActiveDirectoryClient GetActiveDirectoryClientAsUser()
         {
-            Uri servicePointUri = new Uri(Constants.ResourceUrl);
-            Uri serviceRoot = new Uri(servicePointUri, Constants.TenantIdAppOnly);
+            Uri servicePointUri = new Uri(GlobalConstants.ResourceUrl);
+            Uri serviceRoot = new Uri(servicePointUri, UserModeConstants.TenantId);
             ActiveDirectoryClient activeDirectoryClient = new ActiveDirectoryClient(serviceRoot,
-                async () => await AcquireTokenAsyncForApplication());
+                async () => await AcquireTokenAsyncForUser());
             return activeDirectoryClient;
         }
 
@@ -64,9 +84,9 @@ namespace GraphConsoleAppV3
             if (TokenForUser == null)
             {
                 var redirectUri = new Uri("https://localhost");
-                AuthenticationContext authenticationContext = new AuthenticationContext(Constants.AuthString, false);
-                AuthenticationResult userAuthnResult = authenticationContext.AcquireToken(Constants.ResourceUrl,
-                    Constants.ClientIdForUserAuthn, redirectUri, PromptBehavior.RefreshSession);
+                AuthenticationContext authenticationContext = new AuthenticationContext(GlobalConstants.AuthString, false);
+                AuthenticationResult userAuthnResult = authenticationContext.AcquireToken(GlobalConstants.ResourceUrl,
+                    UserModeConstants.ClientId, redirectUri, PromptBehavior.RefreshSession);
                 TokenForUser = userAuthnResult.AccessToken;
                 Console.WriteLine("\n Welcome " + userAuthnResult.UserInfo.GivenName + " " +
                                   userAuthnResult.UserInfo.FamilyName);
@@ -74,17 +94,5 @@ namespace GraphConsoleAppV3
             return TokenForUser;
         }
 
-        /// <summary>
-        /// Get Active Directory Client for User.
-        /// </summary>
-        /// <returns>ActiveDirectoryClient for User.</returns>
-        public static ActiveDirectoryClient GetActiveDirectoryClientAsUser()
-        {
-            Uri servicePointUri = new Uri(Constants.ResourceUrl);
-            Uri serviceRoot = new Uri(servicePointUri, Constants.TenantId);
-            ActiveDirectoryClient activeDirectoryClient = new ActiveDirectoryClient(serviceRoot,
-                async () => await AcquireTokenAsyncForUser());
-            return activeDirectoryClient;
-        }
     }
 }

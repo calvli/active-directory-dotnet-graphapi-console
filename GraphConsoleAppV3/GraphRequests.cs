@@ -53,7 +53,7 @@ namespace GraphConsoleAppV3
                 Console.WriteLine("\n=============================\n\n");
 
 
-                ITenantDetail tenantDetail = await GetTenantDetails(client);
+                ITenantDetail tenantDetail = await GetTenantDetails(client, UserModeConstants.TenantId);
                 User signedInUser = await GetSignedInUser(client);
                 await UpdateSignedInUsersPhoto(signedInUser);
 
@@ -77,7 +77,7 @@ namespace GraphConsoleAppV3
                 await PrintServicePrincipals(client);
                 await PrintApplications(client);
 
-                string graphAppObjectId = await GetAppObjectId(client, Constants.GraphServiceObjectId);
+                string graphAppObjectId = await GetAppObjectId(client, GlobalConstants.GraphServiceObjectId);
                 newApp = await CreateNewApplication(client, newUser);
                 newServicePrincipal = await CreateServicePrincipal(client, newApp);
                 string extName = "linkedInUserId";
@@ -137,7 +137,7 @@ namespace GraphConsoleAppV3
             await PeoplePickerExample(client, searchString);
         }
 
-        private static async Task<ITenantDetail> GetTenantDetails(IActiveDirectoryClient client)
+        private static async Task<ITenantDetail> GetTenantDetails(IActiveDirectoryClient client, string tenantId)
         {
             //*********************************************************************
             // The following section may be run by any user, as long as the app
@@ -164,7 +164,7 @@ namespace GraphConsoleAppV3
             try
             {
                 IPagedCollection<ITenantDetail> tenantsCollection = await client.TenantDetails
-                    .Where(tenantDetail => tenantDetail.ObjectId.Equals(Constants.TenantId))
+                    .Where(tenantDetail => tenantDetail.ObjectId.Equals(tenantId))
                     .ExecuteAsync();
                 List<ITenantDetail> tenantsList = tenantsCollection.CurrentPage.ToList();
 
