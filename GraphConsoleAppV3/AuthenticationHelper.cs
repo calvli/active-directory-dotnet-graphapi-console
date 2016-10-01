@@ -40,8 +40,7 @@ namespace GraphConsoleAppV3
         {
             if (TokenForApplication == null)
             {
-                AuthenticationContext authenticationContext = new AuthenticationContext
-                    (GlobalConstants.AuthString + AppModeConstants.TenantName, false);
+                AuthenticationContext authenticationContext = new AuthenticationContext(AppModeConstants.AuthString, false);
                 // Config for OAuth client credentials 
                 ClientCredential clientCred = new ClientCredential(AppModeConstants.ClientId,
                     AppModeConstants.ClientSecret);
@@ -84,7 +83,7 @@ namespace GraphConsoleAppV3
             if (TokenForUser == null)
             {
                 var redirectUri = new Uri("https://localhost");
-                AuthenticationContext authenticationContext = new AuthenticationContext(GlobalConstants.AuthString, false);
+                AuthenticationContext authenticationContext = new AuthenticationContext(UserModeConstants.AuthString, false);
                 AuthenticationResult userAuthnResult = authenticationContext.AcquireToken(GlobalConstants.ResourceUrl,
                     UserModeConstants.ClientId, redirectUri, PromptBehavior.RefreshSession);
                 TokenForUser = userAuthnResult.AccessToken;

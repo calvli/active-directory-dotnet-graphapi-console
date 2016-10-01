@@ -17,8 +17,7 @@ namespace GraphConsoleAppV3
     {
         public static async Task UserMode()
         {
-            #region Setup Graph client for user
-
+            
             ActiveDirectoryClient client;
 
             //*********************************************************************
@@ -37,15 +36,14 @@ namespace GraphConsoleAppV3
                 return;
             }
 
-            #endregion
-
-            User newUser = new User();
-            Application newApp = new Application();
-            IDomain newDomain = new Domain();
-            Group newGroup = new Group();
-            ExtensionProperty newExtension = new ExtensionProperty();
-            ServicePrincipal newServicePrincipal = new ServicePrincipal();
-            OAuth2PermissionGrant newPermissionGrant = new OAuth2PermissionGrant();
+            
+            User newUser = null;
+            Application newApp = null;
+            IDomain newDomain = null;
+            Group newGroup = null;
+            ExtensionProperty newExtension = null;
+            ServicePrincipal newServicePrincipal = null;
+            OAuth2PermissionGrant newPermissionGrant = null;
 
             try
             {
@@ -55,39 +53,40 @@ namespace GraphConsoleAppV3
 
                 ITenantDetail tenantDetail = await GetTenantDetails(client, UserModeConstants.TenantId);
                 User signedInUser = await GetSignedInUser(client);
-                await UpdateSignedInUsersPhoto(signedInUser);
+                await UpdateUsersPhoto(signedInUser);
+                await PrintUsersGroupsAndRoles(signedInUser);
 
                 Console.WriteLine("\nSearching for any user based on UPN, DisplayName, First or Last Name");
                 Console.WriteLine("\nPlease enter the user's name you are looking for:");
-
                 string searchString = Console.ReadLine();
                 await PeoplePickerExample(client, searchString);
                 await PrintUsersManager(signedInUser);
-                await PrintUsersGroupsAndRoles(signedInUser);
 
                 newUser = await CreateNewUser(client,
                     tenantDetail.VerifiedDomains.First(x => x.@default.HasValue && x.@default.Value));
                 await UpdateNewUser(newUser);
                 await ResetUserPassword(newUser);
                 await AssignManager(newUser, signedInUser);
-                await UserGroupOperations(client, newUser);
+                await AssignLicenses(client, newUser);
 
+                await PrintGroupMembers(client);
                 newGroup = await CreateNewGroup(client);
+                await AddUserToGroup(newGroup, newUser);
+                await RemoveUserFromGroup(newGroup, newUser);
+
                 await PrintAllRoles(client, searchString);
                 await PrintServicePrincipals(client);
                 await PrintApplications(client);
 
-                string graphAppObjectId = await GetAppObjectId(client, GlobalConstants.GraphServiceObjectId);
                 newApp = await CreateNewApplication(client, newUser);
                 newServicePrincipal = await CreateServicePrincipal(client, newApp);
-                string extName = "linkedInUserId";
-                newExtension = await CreateSchemaExtensions(client, newApp, extName);
-                await ManipulateExtensionProperty(newExtension, newUser);
+                newExtension = await CreateSchemaExtensions(client, newApp);
+                await SetExtensionProperty(newExtension, signedInUser);
                 PrintExtensionProperty(newUser, newExtension);
 
                 await AssignAppRole(client, newApp, newServicePrincipal);
+                newPermissionGrant = await CreateOAuth2Permission(client, newServicePrincipal);
                 await PrintDevicesAndOwners(client);
-                newPermissionGrant = await CreateOAuth2Permission(client, newServicePrincipal, graphAppObjectId);
                 await PrintAllPermissions(client);
 
                 await PrintAllDomains(client);
@@ -107,8 +106,7 @@ namespace GraphConsoleAppV3
 
         public static async Task AppMode()
         {
-            #region Setup Microsoft Graph client for app
-
+            
             ActiveDirectoryClient client;
             //*********************************************************************
             // setup Microsoft Graph client for app
@@ -124,8 +122,7 @@ namespace GraphConsoleAppV3
                 return;
             }
 
-            #endregion
-
+            
             Console.WriteLine("\nStarting app-mode requests...");
             Console.WriteLine("\nAll requests are done in the context of the application only (daemon style app)\n\n");
             Console.WriteLine("\n=============================\n\n");
@@ -146,8 +143,7 @@ namespace GraphConsoleAppV3
             // or Directory.AccessAsUser.All will also work, but are much more privileged.
             //*********************************************************************
 
-            #region TenantDetails
-
+            
             //*********************************************************************
             // Get Tenant Details
             // Note: update the string TenantId with your TenantId.
@@ -202,15 +198,13 @@ namespace GraphConsoleAppV3
                 return tenantDetail;
             }
 
-            #endregion
-        }
+                    }
 
+        #region operations with users
         private static async Task<User> GetSignedInUser(ActiveDirectoryClient client)
         {
-            #region Get signed user info, get their photo, and update their photo
-
-            #region Get signed in user details
-
+            
+            
             User signedInUser = new User();
             try
             {
@@ -222,12 +216,7 @@ namespace GraphConsoleAppV3
             {
                 Program.WriteError("\nError getting signed in user {0}", Program.ExtractErrorMessage(e));
             }
-
-
-            #endregion
-
-            #region get signed in user's photo
-
+            
             if (signedInUser.ObjectId != null)
             {
                 IUser sUser = (IUser) signedInUser;
@@ -246,49 +235,11 @@ namespace GraphConsoleAppV3
             }
             return signedInUser;
 
-            #endregion
-        }
-
-        private static async Task UpdateSignedInUsersPhoto(IUser signedInUser)
-        {
-            #region update signed in user's photo
-
-            // NOTE:  Updating the signed in user's photo requires User.ReadWrite (when available) or 
-            // Directory.ReadWrite.All or Directory.AccessAsUser.All
-            if (signedInUser.ObjectId != null)
-            {
-                Console.WriteLine("\nDo you want to update your thumbnail photo? yes/no\n");
-                string update = Console.ReadLine();
-
-                if (update != null && update.Equals("yes"))
-                {
-                    try
-                    {
-                        Console.WriteLine("\nSpecify path of photo:");
-                        string photo = Console.ReadLine();
-                        //TODO - update with allowed art and save locally with project
-                        FileStream fileStream = new FileStream(photo.Trim('"'), FileMode.Open,
-                            FileAccess.Read);
-
-                        await signedInUser.ThumbnailPhoto.UploadAsync(fileStream, "application/image");
-                        Console.WriteLine("\nUser {0} was updated with a thumbnailphoto", signedInUser.DisplayName);
                     }
-                    catch (Exception e)
-                    {
-                        Program.WriteError("\nError Updating the user photo {0}", Program.ExtractErrorMessage(e));
-                    }
-                }
-            }
-
-            #endregion
-
-            #endregion
-        }
 
         private static async Task PeoplePickerExample(IActiveDirectoryClient client, string searchString)
         {
-            #region People Picker example
-
+            
             //*********************************************************************
             // People picker
             // Search for a user using text string "Us" match against userPrincipalName, displayName, giveName, surname
@@ -332,13 +283,11 @@ namespace GraphConsoleAppV3
                 Console.WriteLine("User not found");
             }
 
-            #endregion
-        }
+                    }
 
         private static async Task PrintUsersManager(User user)
         {
-            #region Get user's manager and direct reports, group memberships and role memberships
-
+            
             // ***********************************************************************
             // NOTE:  This requires User.Read.All permission scope, or Directory.Read.All or Directory.AccessAsUser.All
             // Group membership requires Group.Read.All or Directory.Read.All (the latter is required for role memberships)
@@ -399,13 +348,11 @@ namespace GraphConsoleAppV3
                 Program.WriteError("\nError getting user's manager and reports {0}", Program.ExtractErrorMessage(e));
             }
 
-            #endregion
-        }
+                    }
 
         private static async Task PrintUsersGroupsAndRoles(User user)
         {
-            #region Get group and role memberships
-
+            
             Console.WriteLine("\n Signed in user {0} is a member of the following Group and Roles (IDs)",
                 user.DisplayName);
             IUserFetcher signedInUserFetcher = user;
@@ -437,13 +384,11 @@ namespace GraphConsoleAppV3
                     Program.ExtractErrorMessage(e));
             }
 
-            #endregion
-        }
+                    }
 
         private static async Task<User> CreateNewUser(IActiveDirectoryClient client, VerifiedDomain defaultDomain)
         {
-            #region Create a new User
-
+            
             // **********************************************************
             // Requires Directory.ReadWrite.All or Directory.AccessAsUser.All, and the signed in user
             // must be a privileged user (like a company or user admin)
@@ -480,13 +425,43 @@ namespace GraphConsoleAppV3
             }
             return newUser;
 
-            #endregion
-        }
+                    }
+
+        private static async Task UpdateUsersPhoto(IUser user)
+        {
+            
+            // NOTE:  Updating the signed in user's photo requires User.ReadWrite (when available) or 
+            // Directory.ReadWrite.All or Directory.AccessAsUser.All
+            if (user.ObjectId != null)
+            {
+                Console.WriteLine("\nDo you want to update your thumbnail photo? yes/no\n");
+                string update = Console.ReadLine();
+
+                if (update != null && update.Equals("yes"))
+                {
+                    try
+                    {
+                        Console.WriteLine("\nSpecify path of photo:");
+                        string photo = Console.ReadLine();
+                        FileStream fileStream = new FileStream(photo.Trim('"'), FileMode.Open,
+                            FileAccess.Read);
+
+                        await user.ThumbnailPhoto.UploadAsync(fileStream, "application/image");
+                        Console.WriteLine("\nUser {0} was updated with a thumbnailphoto", user.DisplayName);
+                    }
+                    catch (Exception e)
+                    {
+                        Program.WriteError("\nError Updating the user photo {0}", Program.ExtractErrorMessage(e));
+                    }
+                }
+            }
+
+            
+                    }
 
         private static async Task UpdateNewUser(IUser newUser)
         {
-            #region Update User properties
-
+            
             //*******************************************************************************************
             // update the newly created user's Password, PasswordPolicies and City
             //*********************************************************************************************
@@ -502,10 +477,10 @@ namespace GraphConsoleAppV3
                 {
                     await newUser.UpdateAsync();
                     Console.WriteLine("\nUser {0} was updated:", newUser.DisplayName);
-                    Console.WriteLine("\t{0}:\t{1}", "City", "Seattle");
-                    Console.WriteLine("\t{0}:\t{1}", "Country", "UK");
-                    Console.WriteLine("\t{0}:\t{1}", "Mobile", "+4477889456789");
-                    Console.WriteLine("\t{0}:\t{1}", "Type", "Member");
+                    Console.WriteLine("\t{0}:\t{1}", "City", newUser.City);
+                    Console.WriteLine("\t{0}:\t{1}", "Country", newUser.Country);
+                    Console.WriteLine("\t{0}:\t{1}", "Mobile", newUser.Mobile);
+                    Console.WriteLine("\t{0}:\t{1}", "Type", newUser.UserType);
                 }
                 catch (Exception e)
                 {
@@ -513,18 +488,16 @@ namespace GraphConsoleAppV3
                 }
             }
 
-            #endregion
-        }
+                    }
 
-        private static async Task ResetUserPassword(IUser newUser)
+        private static async Task ResetUserPassword(IUser user)
         {
-            #region Reset password for user
-
+            
             //*******************************************************************************************
             // update the newly created user's Password and PasswordPolicies
             // requires Directory.AccessAsUser.All and that the current user is a user, helpdesk or company admin
             //*********************************************************************************************
-            if (newUser.ObjectId != null)
+            if (user.ObjectId != null)
             {
                 // update User's password policy and reset password - forcing change password at next logon
                 PasswordProfile PasswordProfile = new PasswordProfile
@@ -532,12 +505,12 @@ namespace GraphConsoleAppV3
                     Password = "changeMe!",
                     ForceChangePasswordNextLogin = true
                 };
-                newUser.PasswordProfile = PasswordProfile;
-                newUser.PasswordPolicies = "DisablePasswordExpiration, DisableStrongPassword";
+                user.PasswordProfile = PasswordProfile;
+                user.PasswordPolicies = "DisablePasswordExpiration, DisableStrongPassword";
                 try
                 {
-                    await newUser.UpdateAsync();
-                    Console.WriteLine("\nUser {0} password and policy was reset", newUser.DisplayName);
+                    await user.UpdateAsync();
+                    Console.WriteLine("\nUser {0} password and policy was reset", user.DisplayName);
                 }
                 catch (Exception e)
                 {
@@ -545,28 +518,25 @@ namespace GraphConsoleAppV3
                 }
             }
 
-            #endregion
-        }
+                    }
 
-        private static async Task AssignManager(IUser newUser,
-            IUser signedInUser)
+        private static async Task AssignManager(IUser user, IUser manager)
         {
             // *************************************************************
             // These operations require more privileged permissions like Directory.ReadWrite.All or Directory.AccessAsUser.All
             // Update signed in user's manager, update group membership
             // **************************************************************
 
-            #region Assign a manager
-
+            
             // Assign the newly created user a new manager (the signed in user).
-            if (newUser.ObjectId != null)
+            if (user.ObjectId != null)
             {
-                Console.WriteLine("\n Assigning {0} as {1}'s Manager.", signedInUser.DisplayName,
-                    newUser.DisplayName);
-                newUser.Manager = signedInUser as DirectoryObject;
+                Console.WriteLine("\n Assigning {0} as {1}'s Manager.", manager.DisplayName,
+                    user.DisplayName);
+                user.Manager = manager as DirectoryObject;
                 try
                 {
-                    await newUser.UpdateAsync();
+                    await user.UpdateAsync();
                     Console.Write("Manager assignment successful.");
                 }
                 catch (Exception e)
@@ -575,156 +545,11 @@ namespace GraphConsoleAppV3
                 }
             }
 
-            #endregion
-        }
+                    }
 
-        private static async Task UserGroupOperations(IActiveDirectoryClient client, IUser newUser)
+        private static async Task AssignLicenses(IActiveDirectoryClient client, IUser user)
         {
-
-            #region Add the new user to a selected group
-
-            // Search for a group and assign the newUser to the found group
-
-            //*********************************************************************
-            // Search for a group using a startsWith filter (displayName property)
-            //*********************************************************************
-            Group retrievedGroup = new Group();
-            Console.WriteLine("\nSearch for a group, by name, to add the current user to:");
-            string groupName = Console.ReadLine();
-
-            List<IGroup> foundGroups = null;
-            try
-            {
-                IPagedCollection<IGroup> groupsCollection = await client.Groups
-                    .Where(group => group.DisplayName.StartsWith(groupName))
-                    .ExecuteAsync();
-                foundGroups = groupsCollection.CurrentPage.ToList();
-            }
-            catch (Exception e)
-            {
-                Program.WriteError("\nError getting Group {0}", e.Message, Program.ExtractErrorMessage(e));
-            }
-            if (foundGroups != null && foundGroups.Count > 0)
-            {
-                int pickedGroupIndex = default(int);
-
-                if (foundGroups.Count == 1)
-                {
-                    pickedGroupIndex = 0;
-                }
-                else
-                {
-                    for (int i = 0; i < foundGroups.Count; i++)
-                    {
-                        Console.WriteLine("\n{0}. {1}", i + 1, foundGroups[i].DisplayName);
-                    }
-
-                    string keyString;
-                    int key;
-                    do
-                    {
-                        Console.WriteLine("Pick the group you want to add the new user to by entering a number:");
-                        keyString = Console.ReadLine();
-                    } while (!(int.TryParse(keyString, out key) && key > 0 && key <= foundGroups.Count));
-                    pickedGroupIndex = key - 1;
-                }
-                // add new user to picked group
-                if (foundGroups[pickedGroupIndex].ObjectId != null)
-                {
-                    try
-                    {
-                        retrievedGroup = (Group) foundGroups[pickedGroupIndex];
-                        retrievedGroup.Members.Add(newUser as DirectoryObject);
-                        await retrievedGroup.UpdateAsync();
-                    }
-                    catch (Exception e)
-                    {
-                        Program.WriteError("\nError assigning member to group. {0}", e.Message,
-                            Program.ExtractErrorMessage(e));
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine("Group not Found based on search criteria, and hence user not added to group");
-            }
-
-            #endregion
-
-            #region Get Group members
-
-            if (retrievedGroup.ObjectId != null)
-            {
-                Console.WriteLine("\n Enumerating group members for: " + retrievedGroup.DisplayName + "\n " +
-                                  retrievedGroup.Description);
-
-                //*********************************************************************
-                // get the groups' membership - 
-                // Note this method retrieves ALL links in one request - please use this method with care - this
-                // may return a very large number of objects
-                //*********************************************************************
-                IGroupFetcher retrievedGroupFetcher = retrievedGroup;
-                try
-                {
-                    IPagedCollection<IDirectoryObject> members = await retrievedGroupFetcher.Members.ExecuteAsync();
-                    Console.WriteLine(" Members:");
-                    do
-                    {
-                        List<IDirectoryObject> directoryObjects = members.CurrentPage.ToList();
-                        foreach (IDirectoryObject member in directoryObjects)
-                        {
-                            if (member is User)
-                            {
-                                User user = member as User;
-                                Console.WriteLine("User DisplayName: {0}  UPN: {1}",
-                                    user.DisplayName,
-                                    user.UserPrincipalName);
-                            }
-                            if (member is Group)
-                            {
-                                Group group = member as Group;
-                                Console.WriteLine("Group DisplayName: {0}", group.DisplayName);
-                            }
-                            if (member is Contact)
-                            {
-                                Contact contact = member as Contact;
-                                Console.WriteLine("Contact DisplayName: {0}", contact.DisplayName);
-                            }
-                        }
-                        members = await members.GetNextPageAsync();
-                    } while (members != null);
-                }
-                catch (Exception e)
-                {
-                    Program.WriteError("\nError getting groups' membership. {0}", e.Message,
-                        Program.ExtractErrorMessage(e));
-                }
-            }
-
-            #endregion
-
-            #region Remove new user from the group
-
-            //*********************************************************************************************
-            // Delete user from the earlier selected Group 
-            //*********************************************************************************************
-            if (retrievedGroup.ObjectId != null)
-            {
-                try
-                {
-                    retrievedGroup.Members.Remove(newUser as DirectoryObject);
-                    await retrievedGroup.UpdateAsync();
-                }
-                catch (Exception e)
-                {
-                    Program.WriteError("\nError removing user from group {0}", Program.ExtractErrorMessage(e));
-                }
-            }
-
-            #endregion
-
-            #region New user License Assignment
-
+            
             //*********************************************************************************************
             // User License Assignment - assign EnterprisePack license to new user, and disable SharePoint service
             //   first get a list of Tenant's subscriptions and find the "Enterprisepack" one
@@ -740,63 +565,187 @@ namespace GraphConsoleAppV3
             {
                 Program.WriteError("\nError getting Applications {0}", Program.ExtractErrorMessage(e));
             }
-            if (skus != null)
+            while (skus != null)
             {
-                do
+                List<ISubscribedSku> subscribedSkus = skus.CurrentPage.ToList();
+                foreach (ISubscribedSku sku in subscribedSkus)
                 {
-                    List<ISubscribedSku> subscribedSkus = skus.CurrentPage.ToList();
-                    foreach (ISubscribedSku sku in subscribedSkus)
+                    if (sku.SkuPartNumber == "ENTERPRISEPACK")
                     {
-                        if (sku.SkuPartNumber == "ENTERPRISEPACK")
+                        if ((sku.PrepaidUnits.Enabled.Value > sku.ConsumedUnits) &&
+                            (sku.CapabilityStatus == "Enabled"))
                         {
-                            if ((sku.PrepaidUnits.Enabled.Value > sku.ConsumedUnits) &&
-                                (sku.CapabilityStatus == "Enabled"))
+                            // create addLicense object and assign the Enterprise Sku GUID to the skuId
+                            AssignedLicense addLicense = new AssignedLicense {SkuId = sku.SkuId.Value};
+
+                            // find plan id of SharePoint Service Plan
+                            foreach (ServicePlanInfo servicePlan in sku.ServicePlans)
                             {
-                                // create addLicense object and assign the Enterprise Sku GUID to the skuId
-                                AssignedLicense addLicense = new AssignedLicense {SkuId = sku.SkuId.Value};
-
-                                // find plan id of SharePoint Service Plan
-                                foreach (ServicePlanInfo servicePlan in sku.ServicePlans)
+                                if (servicePlan.ServicePlanName.Contains("SHAREPOINT"))
                                 {
-                                    if (servicePlan.ServicePlanName.Contains("SHAREPOINT"))
-                                    {
-                                        addLicense.DisabledPlans.Add(servicePlan.ServicePlanId.Value);
-                                        break;
-                                    }
+                                    addLicense.DisabledPlans.Add(servicePlan.ServicePlanId.Value);
+                                    break;
                                 }
+                            }
 
-                                IList<AssignedLicense> licensesToAdd = new[] {addLicense};
-                                IList<Guid> licensesToRemove = new Guid[] {};
+                            IList<AssignedLicense> licensesToAdd = new[] {addLicense};
+                            IList<Guid> licensesToRemove = new Guid[] {};
 
-                                // attempt to assign the license object to the new user 
-                                try
+                            // attempt to assign the license object to the new user 
+                            try
+                            {
+                                if (user.ObjectId != null)
                                 {
-                                    if (newUser.ObjectId != null)
-                                    {
-                                        await newUser.AssignLicenseAsync(licensesToAdd, licensesToRemove);
-                                        Console.WriteLine("\n User {0} was assigned license {1}",
-                                            newUser.DisplayName,
-                                            addLicense.SkuId);
-                                    }
+                                    await user.AssignLicenseAsync(licensesToAdd, licensesToRemove);
+                                    Console.WriteLine("\n User {0} was assigned license {1}",
+                                        user.DisplayName,
+                                        addLicense.SkuId);
                                 }
-                                catch (Exception e)
-                                {
-                                    Program.WriteError("\nError Assigning License {0}", Program.ExtractErrorMessage(e));
-                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Program.WriteError("\nError Assigning License {0}", Program.ExtractErrorMessage(e));
                             }
                         }
                     }
-                    skus = await skus.GetNextPageAsync();
-                } while (skus != null);
+                }
+                skus = await skus.GetNextPageAsync();
             }
 
-            #endregion
-        }
+                    }
+        #endregion
+
+        #region group operations
+        private static async Task AddUserToGroup(Group group, IUser user)
+        {
+                        // add new user to picked group
+            try
+            {
+                group.Members.Add(user as DirectoryObject);
+                await group.UpdateAsync();
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError assigning member to group. {0}", e.Message,
+                    Program.ExtractErrorMessage(e));
+            }
+                    }
+
+        private static async Task PrintGroupMembers(ActiveDirectoryClient client)
+        {
+                        // Search for a group and assign the newUser to the found group
+            Console.WriteLine("\nSearch for a group, by name, to add the current user to:");
+            string groupName = Console.ReadLine();
+            //*********************************************************************
+            // Search for a group using a startsWith filter (displayName property)
+            //*********************************************************************
+            List<IGroup> foundGroups = null;
+            IGroup retrievedGroup = null;
+            try
+            {
+                IPagedCollection<IGroup> groupsCollection = await client.Groups
+                    .Where(g => g.DisplayName.StartsWith(groupName))
+                    .ExecuteAsync();
+                foundGroups = groupsCollection.CurrentPage.ToList();
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError getting Group {0}", e.Message, Program.ExtractErrorMessage(e));
+            }
+            if (foundGroups != null && foundGroups.Count > 0)
+            {
+                if (foundGroups.Count == 1)
+                {
+                    retrievedGroup = foundGroups[0];
+                }
+                else
+                {
+                    for (int i = 0; i < foundGroups.Count; i++)
+                    {
+                        Console.WriteLine("\n{0}. {1}", i + 1, foundGroups[i].DisplayName);
+                    }
+
+                    string keyString;
+                    int key;
+                    do
+                    {
+                        Console.WriteLine("Pick the group you want to add the new user to by entering a number:");
+                        keyString = Console.ReadLine();
+                    } while (!(int.TryParse(keyString, out key) && key > 0 && key <= foundGroups.Count));
+                    retrievedGroup = foundGroups[key - 1];
+                }
+            }
+            if (retrievedGroup != null && retrievedGroup.ObjectId != null)
+            {
+                Console.WriteLine("\n Enumerating group members for: " + retrievedGroup.DisplayName + "\n " +
+                                  retrievedGroup.Description);
+
+                //*********************************************************************
+                // get the groups' membership - 
+                // Note this method retrieves ALL links in one request - please use this method with care - this
+                // may return a very large number of objects
+                //*********************************************************************
+                IGroupFetcher retrievedGroupFetcher = (IGroupFetcher) retrievedGroup;
+                try
+                {
+                    IPagedCollection<IDirectoryObject> members = await retrievedGroupFetcher.Members.ExecuteAsync();
+                    Console.WriteLine(" Members:");
+                    do
+                    {
+                        List<IDirectoryObject> directoryObjects = members.CurrentPage.ToList();
+                        foreach (IDirectoryObject member in directoryObjects)
+                        {
+                            if (member is User)
+                            {
+                                Console.WriteLine("User DisplayName: {0}  UPN: {1}",
+                                    (member as User).DisplayName,
+                                    (member as User).UserPrincipalName);
+                            }
+                            if (member is Group)
+                            {
+                                Console.WriteLine("Group DisplayName: {0}", (member as Group).DisplayName);
+                            }
+                            if (member is Contact)
+                            {
+                                Console.WriteLine("Contact DisplayName: {0}", (member as Contact).DisplayName);
+                            }
+                        }
+                        members = await members.GetNextPageAsync();
+                    } while (members != null);
+                }
+                catch (Exception e)
+                {
+                    Program.WriteError("\nError getting groups' membership. {0}", e.Message,
+                        Program.ExtractErrorMessage(e));
+                }
+            }
+
+                    }
+
+        private static async Task RemoveUserFromGroup(Group group, IUser user)
+        {
+            
+            //*********************************************************************************************
+            // Delete user from the earlier selected Group 
+            //*********************************************************************************************
+            if (group.ObjectId != null)
+            {
+                try
+                {
+                    group.Members.Remove(user as DirectoryObject);
+                    await group.UpdateAsync();
+                }
+                catch (Exception e)
+                {
+                    Program.WriteError("\nError removing user from group {0}", Program.ExtractErrorMessage(e));
+                }
+            }
+
+                    }
 
         private static async Task<Group> CreateNewGroup(IActiveDirectoryClient client)
         {
-            #region Create a new Group
-
+            
             //*********************************************************************************************
             // Create a new Group
             //*********************************************************************************************
@@ -819,74 +768,12 @@ namespace GraphConsoleAppV3
             }
             return newGroup;
 
-            #endregion
-        }
+                    }
+        #endregion
 
-        private static async Task PrintAllRoles(IActiveDirectoryClient client, string searchString)
-        {
-            #region Get All Roles
+        #region Applications and Service Principals
 
-            //*********************************************************************
-            // Get All Roles
-            //*********************************************************************
-            List<IDirectoryRole> foundRoles = null;
-            try
-            {
-                IPagedCollection<IDirectoryRole> rolesCollection = await client.DirectoryRoles.ExecuteAsync();
-                foundRoles = rolesCollection.CurrentPage.ToList();
-            }
-            catch (Exception e)
-            {
-                Program.WriteError("\nError getting Roles {0}", Program.ExtractErrorMessage(e));
-            }
-
-            if (foundRoles != null && foundRoles.Count > 0)
-            {
-                foreach (IDirectoryRole role in foundRoles)
-                {
-                    Console.WriteLine("\n Found Role: {0} {1} {2} ",
-                        role.DisplayName, role.Description, role.ObjectId);
-                }
-            }
-            else
-            {
-                Console.WriteLine("Role Not Found {0}", searchString);
-            }
-
-            #endregion
-        }
-
-        private static async Task PrintServicePrincipals(IActiveDirectoryClient client)
-        {
-            #region Get Service Principals
-
-            //*********************************************************************
-            // get the Service Principals
-            //*********************************************************************
-            IPagedCollection<IServicePrincipal> servicePrincipals = null;
-            try
-            {
-                servicePrincipals = await client.ServicePrincipals.ExecuteAsync();
-            }
-            catch (Exception e)
-            {
-                Program.WriteError("\nError getting Service Principal {0}", e.Message, Program.ExtractErrorMessage(e));
-            }
-            while (servicePrincipals != null)
-            {
-                List<IServicePrincipal> servicePrincipalsList = servicePrincipals.CurrentPage.ToList();
-                foreach (IServicePrincipal servicePrincipal in servicePrincipalsList)
-                {
-                    Console.WriteLine("Service Principal AppId: {0}  Name: {1}", servicePrincipal.AppId,
-                        servicePrincipal.DisplayName);
-                }
-                servicePrincipals = await servicePrincipals.GetNextPageAsync();
-            }
-
-            #endregion
-        }
-
-        private static async Task<string> GetAppObjectId(IActiveDirectoryClient client, string servicePrincipalObjectId)
+        private static async Task<string> GetServicePrincipalObjectId(IActiveDirectoryClient client, string applicationId)
         {
             IPagedCollection<IServicePrincipal> servicePrincipals = null;
             try
@@ -902,7 +789,7 @@ namespace GraphConsoleAppV3
             {
                 List<IServicePrincipal> servicePrincipalsList = servicePrincipals.CurrentPage.ToList();
                 IServicePrincipal servicePrincipal =
-                    servicePrincipalsList.FirstOrDefault(x => x.AppId.Equals(servicePrincipalObjectId));
+                    servicePrincipalsList.FirstOrDefault(x => x.AppId.Equals(applicationId));
 
                 if (servicePrincipal != null)
                 {
@@ -916,8 +803,7 @@ namespace GraphConsoleAppV3
 
         private static async Task PrintApplications(IActiveDirectoryClient client)
         {
-            #region Get Applications
-
+            
             //*********************************************************************
             // get the Application objects
             //*********************************************************************
@@ -943,13 +829,39 @@ namespace GraphConsoleAppV3
                 } while (applications != null);
             }
 
-            #endregion
-        }
+                    }
 
-        private static async Task<Application> CreateNewApplication(IActiveDirectoryClient client, IUser newUser)
+        private static async Task PrintServicePrincipals(IActiveDirectoryClient client)
         {
-            #region Create Application
+            
+            //*********************************************************************
+            // get the Service Principals
+            //*********************************************************************
+            IPagedCollection<IServicePrincipal> servicePrincipals = null;
+            try
+            {
+                servicePrincipals = await client.ServicePrincipals.ExecuteAsync();
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError getting Service Principal {0}", e.Message, Program.ExtractErrorMessage(e));
+            }
+            while (servicePrincipals != null)
+            {
+                List<IServicePrincipal> servicePrincipalsList = servicePrincipals.CurrentPage.ToList();
+                foreach (IServicePrincipal servicePrincipal in servicePrincipalsList)
+                {
+                    Console.WriteLine("Service Principal AppId: {0}  Name: {1}", servicePrincipal.AppId,
+                        servicePrincipal.DisplayName);
+                }
+                servicePrincipals = await servicePrincipals.GetNextPageAsync();
+            }
 
+                    }
+
+        private static async Task<Application> CreateNewApplication(IActiveDirectoryClient client, IUser user)
+        {
+            
             //*********************************************************************************************
             // Create a new Application object, with an App Role definition
             //*********************************************************************************************
@@ -988,11 +900,11 @@ namespace GraphConsoleAppV3
             }
 
             // add an owner for the newly created application
-            newApp.Owners.Add(newUser as DirectoryObject);
+            newApp.Owners.Add(user as DirectoryObject);
             try
             {
                 await newApp.UpdateAsync();
-                Console.WriteLine("Added owner: " + newApp.DisplayName, newUser.DisplayName);
+                Console.WriteLine("Added owner: " + newApp.DisplayName, user.DisplayName);
             }
             catch (Exception e)
             {
@@ -1028,23 +940,21 @@ namespace GraphConsoleAppV3
             }
             return newApp;
 
-            #endregion
-        }
+                    }
 
         private static async Task<ServicePrincipal> CreateServicePrincipal(IActiveDirectoryClient client,
-            IApplication newApp)
+            IApplication application)
         {
-            #region Create Service Principal
 
             //*********************************************************************************************
             // create a new Service principal, from the application object that was just created
             //*********************************************************************************************
             ServicePrincipal newServicePrincipal = new ServicePrincipal();
-            if (newApp.AppId != null)
+            if (application.AppId != null)
             {
-                newServicePrincipal.DisplayName = newApp.DisplayName;
+                newServicePrincipal.DisplayName = application.DisplayName;
                 newServicePrincipal.AccountEnabled = true;
-                newServicePrincipal.AppId = newApp.AppId;
+                newServicePrincipal.AppId = application.AppId;
                 try
                 {
                     await client.ServicePrincipals.AddServicePrincipalAsync(newServicePrincipal);
@@ -1056,25 +966,44 @@ namespace GraphConsoleAppV3
                 }
             }
             return newServicePrincipal;
-
-            #endregion
         }
 
-        private static async Task<ExtensionProperty> CreateSchemaExtensions(IActiveDirectoryClient client,
-            Application newApp,
-            string extName)
-        {
-            #region Create an Extension Property
+        #endregion
 
+        #region Extension Properties
+
+        private static void PrintExtensionProperty(User user, ExtensionProperty extension)
+        {
+
+            try
+            {
+                if (extension != null && user != null && user.ObjectId != null)
+                {
+                    Console.WriteLine("\n Retrieved User {0}'s extended property value is: {1}.",
+                        user.DisplayName,
+                        extension);
+                }
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError Updating the user object {0}", Program.ExtractErrorMessage(e));
+            }
+
+        }
+
+        private static async Task<ExtensionProperty> CreateSchemaExtensions(
+            IActiveDirectoryClient client, Application application)
+        {
+            
             // **************************************************************************************************
             // Create a new extension property - to extend the user entity
             // This is accomplished by declaring the extension property through an application object
             // **************************************************************************************************
-            if (newApp.ObjectId != null)
+            if (application.ObjectId != null)
             {
                 ExtensionProperty linkedInUserId = new ExtensionProperty
                 {
-                    Name = extName,
+                    Name = "linkedInUserId",
                     DataType = "String",
                     TargetObjects = {"User"}
                 };
@@ -1086,8 +1015,8 @@ namespace GraphConsoleAppV3
                     {
                         Console.WriteLine("\nExtension: {0}", ext.Name);
                     }
-                    newApp.ExtensionProperties.Add(linkedInUserId);
-                    await newApp.UpdateAsync();
+                    application.ExtensionProperties.Add(linkedInUserId);
+                    await application.UpdateAsync();
                     Console.WriteLine("\nUser object extended successfully with extension: {0}.", linkedInUserId.Name);
                 }
                 catch (Exception e)
@@ -1096,15 +1025,13 @@ namespace GraphConsoleAppV3
                 }
                 return linkedInUserId;
 
-                #endregion
-            }
+                            }
             return null;
         }
 
-        private static async Task ManipulateExtensionProperty(ExtensionProperty newExtension, User newUser)
+        private static async Task SetExtensionProperty(ExtensionProperty extension, User user)
         {
-            #region Manipulate an Extension Property
-
+            
             // **************************************************************************************************
             // Update an extension property that exists on the user entity
             // **************************************************************************************************
@@ -1112,11 +1039,11 @@ namespace GraphConsoleAppV3
             // create the extension attribute name, for the extension that we just created
             try
             {
-                if (newExtension != null && newUser != null && newUser.ObjectId != null)
+                if (extension != null && user != null && user.ObjectId != null)
                 {
-                    newUser.SetExtendedProperty(newExtension.Name, "user@linkedin.com");
-                    await newUser.UpdateAsync();
-                    Console.WriteLine("\nUser {0}'s extended property set successully.", newUser.DisplayName);
+                    user.SetExtendedProperty(extension.Name, "user@linkedin.com");
+                    await user.UpdateAsync();
+                    Console.WriteLine("\nUser {0}'s extended property set successully.", user.DisplayName);
                 }
             }
             catch (Exception e)
@@ -1124,46 +1051,27 @@ namespace GraphConsoleAppV3
                 Program.WriteError("\nError Updating the user object {0}", Program.ExtractErrorMessage(e));
             }
 
-            #endregion
-        }
+                    }
 
-        private static void PrintExtensionProperty(User user, ExtensionProperty newExtension)
-        {
-            #region Get an Extension Property
+        #endregion
 
-            try
-            {
-                if (newExtension != null && user != null && user.ObjectId != null)
-                {
-                    Console.WriteLine("\n Retrieved User {0}'s extended property value is: {1}.",
-                        user.DisplayName,
-                        newExtension);
-                }
-            }
-            catch (Exception e)
-            {
-                Program.WriteError("\nError Updating the user object {0}", Program.ExtractErrorMessage(e));
-            }
-
-            #endregion
-        }
+        #region Permissions and Roles
 
         private static async Task AssignAppRole(IActiveDirectoryClient client,
-            Application newApp,
-            ServicePrincipal newServicePrincipal)
+            Application application,
+            ServicePrincipal servicePrincipal)
         {
-            #region Assign an app role
-
+            
             try
             {
                 User user =
                     (User) (await client.Users.ExecuteAsync()).CurrentPage.ToList().FirstOrDefault();
-                if (newApp.ObjectId != null && user != null && newServicePrincipal.ObjectId != null)
+                if (application.ObjectId != null && user != null && servicePrincipal.ObjectId != null)
                 {
                     // create the app role assignment
                     AppRoleAssignment appRoleAssignment = new AppRoleAssignment();
-                    appRoleAssignment.Id = newApp.AppRoles.FirstOrDefault().Id;
-                    appRoleAssignment.ResourceId = Guid.Parse(newServicePrincipal.ObjectId);
+                    appRoleAssignment.Id = application.AppRoles.FirstOrDefault().Id;
+                    appRoleAssignment.ResourceId = Guid.Parse(servicePrincipal.ObjectId);
                     appRoleAssignment.PrincipalType = "User";
                     appRoleAssignment.PrincipalId = Guid.Parse(user.ObjectId);
                     user.AppRoleAssignments.Add(appRoleAssignment);
@@ -1185,14 +1093,11 @@ namespace GraphConsoleAppV3
                 Program.WriteError("\nError Assigning Direct Permission: {0}", Program.ExtractErrorMessage(e));
             }
 
-        }
-
-        #endregion
+                    }
 
         private static async Task PrintDevicesAndOwners(IActiveDirectoryClient client)
         {
-            #region Get Devices
-
+            
             //*********************************************************************************************
             // Get a list of Mobile Devices from tenant
             //*********************************************************************************************
@@ -1236,58 +1141,43 @@ namespace GraphConsoleAppV3
                 } while (devices != null);
             }
 
-            #endregion
-        }
+                    }
 
-        private static async Task<OAuth2PermissionGrant> CreateOAuth2Permission(
-            IActiveDirectoryClient client,
-            ServicePrincipal newServicePrincipal,
-            string graphAppObjectId)
+        private static async Task PrintAllRoles(IActiveDirectoryClient client, string searchString)
         {
-            #region Create a new consentable OAuth2 permission
-
-            //*********************************************************************************************
-            // Create new  oauth2 permission object
-            //*********************************************************************************************
-            if (newServicePrincipal.ObjectId != null)
+            
+            //*********************************************************************
+            // Get All Roles
+            //*********************************************************************
+            List<IDirectoryRole> foundRoles = null;
+            try
             {
-                OAuth2PermissionGrant permissionObject = new OAuth2PermissionGrant
-                {
-                    ConsentType = "AllPrincipals",
-                    Scope = "user_impersonation",
-                    StartTime = DateTime.Now,
-                    ExpiryTime = (DateTime.Now).AddMonths(12),
-                    ResourceId = graphAppObjectId,
-                    ClientId = newServicePrincipal.ObjectId
-                };
-
-                // AppId of AzureAd (Graph API)
-
-                //ClientId = objectId of servicePrincipal
-
-                // add the oauth2 permission scope grant
-                try
-                {
-                    await client.Oauth2PermissionGrants.AddOAuth2PermissionGrantAsync(permissionObject);
-                    Console.WriteLine("New Permission object created: " + permissionObject.ObjectId);
-                }
-                catch (Exception e)
-                {
-                    Program.WriteError("\nError with Permission Creation: {0}", Program.ExtractErrorMessage(e));
-                }
-
-                return permissionObject;
+                IPagedCollection<IDirectoryRole> rolesCollection = await client.DirectoryRoles.ExecuteAsync();
+                foundRoles = rolesCollection.CurrentPage.ToList();
+            }
+            catch (Exception e)
+            {
+                Program.WriteError("\nError getting Roles {0}", Program.ExtractErrorMessage(e));
             }
 
-            #endregion
+            if (foundRoles != null && foundRoles.Count > 0)
+            {
+                foreach (IDirectoryRole role in foundRoles)
+                {
+                    Console.WriteLine("\n Found Role: {0} {1} {2} ",
+                        role.DisplayName, role.Description, role.ObjectId);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Role Not Found {0}", searchString);
+            }
 
-            return null;
-        }
+                    }
 
         private static async Task PrintAllPermissions(IActiveDirectoryClient client)
         {
-            #region Get All Permissions
-
+            
             //*********************************************************************************************
             // get all Permission Objects
             //*********************************************************************************************
@@ -1314,8 +1204,45 @@ namespace GraphConsoleAppV3
                 } while (permissions != null);
             }
 
-            #endregion
+                    }
+
+        private static async Task<OAuth2PermissionGrant> CreateOAuth2Permission(
+            IActiveDirectoryClient client,
+            ServicePrincipal servicePrincipal)
+        {
+            
+            //*********************************************************************************************
+            // Create new  oauth2 permission object
+            //*********************************************************************************************
+            if (servicePrincipal.ObjectId != null)
+            {
+                OAuth2PermissionGrant permissionObject = new OAuth2PermissionGrant
+                {
+                    ConsentType = "AllPrincipals",
+                    Scope = "user_impersonation",
+                    StartTime = DateTime.Now,
+                    ExpiryTime = (DateTime.Now).AddMonths(12),
+                    ResourceId = await GetServicePrincipalObjectId(client, GlobalConstants.GraphServiceObjectId),
+                    ClientId = servicePrincipal.ObjectId
+                };
+                try
+                {
+                    await client.Oauth2PermissionGrants.AddOAuth2PermissionGrantAsync(permissionObject);
+                    Console.WriteLine("New Permission object created: " + permissionObject.ObjectId);
+                }
+                catch (Exception e)
+                {
+                    Program.WriteError("\nError with Permission Creation: {0}", Program.ExtractErrorMessage(e));
+                }
+
+                return permissionObject;
+            }
+
+            
+            return null;
         }
+
+        #endregion
 
         #region Domain Operations
 
@@ -1372,19 +1299,19 @@ namespace GraphConsoleAppV3
 
         #region CleanUp
 
-        private static async Task DeleteUser(IUser newUser)
+        private static async Task DeleteUser(IUser user)
         {
             #region Delete user
 
             //*********************************************************************************************
             // Delete the user that we just created earlier
             //*********************************************************************************************
-            if (newUser.ObjectId != null)
+            if (user != null)
             {
                 try
                 {
-                    await newUser.DeleteAsync();
-                    Console.WriteLine("\nUser {0} was deleted", newUser.DisplayName);
+                    await user.DeleteAsync();
+                    Console.WriteLine("\nUser {0} was deleted", user.DisplayName);
                 }
                 catch (Exception e)
                 {
@@ -1395,19 +1322,19 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static async Task DeleteGroup(Group newGroup)
+        private static async Task DeleteGroup(Group group)
         {
             #region Delete Group
 
             //*********************************************************************************************
             // Delete the Group that we just created
             //*********************************************************************************************
-            if (newGroup.ObjectId != null)
+            if (group != null)
             {
                 try
                 {
-                    await newGroup.DeleteAsync();
-                    Console.WriteLine("\nGroup {0} was deleted", newGroup.DisplayName);
+                    await group.DeleteAsync();
+                    Console.WriteLine("\nGroup {0} was deleted", group.DisplayName);
                 }
                 catch (Exception e)
                 {
@@ -1418,14 +1345,14 @@ namespace GraphConsoleAppV3
             #endregion
         }
 
-        private static async Task DeleteApplication(Application newApp, ExtensionProperty newExtension = null)
+        private static async Task DeleteApplication(Application application, ExtensionProperty newExtension = null)
         {
             #region Delete Application
 
             //*********************************************************************************************
             // Delete Application Objects
             //*********************************************************************************************
-            if (newApp.ObjectId != null)
+            if (application != null)
             {
                 try
                 {
@@ -1433,7 +1360,7 @@ namespace GraphConsoleAppV3
                     {
                         try
                         {
-                            newApp.ExtensionProperties.Remove(newExtension);
+                            application.ExtensionProperties.Remove(newExtension);
                             Console.WriteLine("\nDeleted extension property: " + newExtension.Name);
                         }
                         catch (Exception e)
@@ -1442,8 +1369,8 @@ namespace GraphConsoleAppV3
                                 Program.ExtractErrorMessage(e));
                         }
                     }
-                    await newApp.DeleteAsync();
-                    Console.WriteLine("\nDeleted Application object: " + newApp.ObjectId);
+                    await application.DeleteAsync();
+                    Console.WriteLine("\nDeleted Application object: " + application.ObjectId);
                 }
                 catch (Exception e)
                 {
@@ -1458,45 +1385,48 @@ namespace GraphConsoleAppV3
             ServicePrincipal servicePrincipal, 
             OAuth2PermissionGrant permissionGrant = null)
         {
-            try
+            if (servicePrincipal != null)
             {
-                await servicePrincipal.DeleteAsync();
-                Console.WriteLine("Deleted service principal object: " + servicePrincipal.ObjectId);
-                // remove the oauth2 permission scope grant
                 try
                 {
+                    // remove the oauth2 permission scope grant
                     if (permissionGrant != null)
                     {
-                        servicePrincipal.Oauth2PermissionGrants.Remove(permissionGrant);
-                        await servicePrincipal.UpdateAsync();
-                        Console.WriteLine("Removed Permission object: " + permissionGrant.ObjectId);
+                        try
+                        {
+                            servicePrincipal.Oauth2PermissionGrants.Remove(permissionGrant);
+                            await servicePrincipal.UpdateAsync();
+                            Console.WriteLine("Removed Permission object: " + permissionGrant.ObjectId);
+                        }
+
+                        catch (Exception e)
+                        {
+                            Program.WriteError("\nError with Permission Deletion: {0}", Program.ExtractErrorMessage(e));
+                        }
                     }
+                    await servicePrincipal.DeleteAsync();
+                    Console.WriteLine("Deleted service principal object: " + servicePrincipal.ObjectId);                
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError with Permission Deletion: {0}", Program.ExtractErrorMessage(e));
+                    Program.WriteError("\nError with Service Principal deletion: {0}", Program.ExtractErrorMessage(e));
                 }
-            }
-            catch (Exception e)
-            {
-                Program.WriteError("\nError with Service Principal deletion: {0} {1}", e.Message,
-                    e.InnerException != null ? e.InnerException.Message : "");
             }
         }
 
-        private static async Task DeleteDomain(IDomain newDomain)
+        private static async Task DeleteDomain(IDomain domain)
         {
             #region Delete Domain
 
             //*********************************************************************************************
             // Delete Domain we created
             //*********************************************************************************************
-            if (newDomain.Name != null)
+            if (domain != null)
             {
                 try
                 {
-                    await newDomain.DeleteAsync();
-                    Console.WriteLine("\nDeleted Domain: " + newDomain.Name);
+                    await domain.DeleteAsync();
+                    Console.WriteLine("\nDeleted Domain: " + domain.Name);
                 }
                 catch (Exception e)
                 {
@@ -1509,10 +1439,9 @@ namespace GraphConsoleAppV3
 
         #endregion
 
+        #region batch operations
         private static async Task BatchOperations(ActiveDirectoryClient client)
         {
-            #region Batch Operations
-
             //*********************************************************************************************
             // Show Batching with 3 operators.  Note: up to 5 operations can be in a batch
             //*********************************************************************************************
@@ -1544,8 +1473,7 @@ namespace GraphConsoleAppV3
             {
                 Program.WriteError("\nError with batch execution. : {0}", Program.ExtractErrorMessage(e));
             }
-
-            #endregion
         }
+        #endregion
     }
 }
