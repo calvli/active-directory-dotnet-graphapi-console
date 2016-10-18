@@ -30,7 +30,6 @@ However, this is only a user account and does not have administrative permission
 will see "..unauthorized.." response errors when attempting any requests requiring admin permissions.  To see how updates
 work, you will need to configure and use this sample with your own tenant - see the next step.
 
-
 ## Step 3: Running this application with your own Azure Active Directory tenant
 Register the Sample app for your own tenant 
 
