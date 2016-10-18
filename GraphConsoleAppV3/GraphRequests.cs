@@ -92,8 +92,8 @@ namespace GraphConsoleAppV3
 
                 await PrintAllDomains(client);
                 newDomain = await CreateNewDomain(client);
-                await PrintDomainVerificationDetails(newDomain as IDomainFetcher);
-                await VerifyDomain(newDomain);
+                PrintDomainVerificationDetails(newDomain as IDomainFetcher);
+                VerifyDomain(newDomain);
 
                 await BatchOperations(client);
             }
@@ -1296,7 +1296,7 @@ namespace GraphConsoleAppV3
             return newDomain;
         }
 
-        private static async Task PrintDomainVerificationDetails(IDomainFetcher domainFetcher)
+        private static void PrintDomainVerificationDetails(IDomainFetcher domainFetcher)
         {
             // get verification details - this onfo is used to update your registrar/DNS host, so that verification can be performed
             try
@@ -1328,7 +1328,7 @@ namespace GraphConsoleAppV3
 
         }
 
-        private static async Task VerifyDomain(IDomain domain)
+        private static void VerifyDomain(IDomain domain)
         {
             // now attempt to verify the domain
             // this should be run in a loop with a backoof delay, to keep calling verify until the domain is verified.

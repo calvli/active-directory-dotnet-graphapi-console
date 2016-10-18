@@ -28,9 +28,9 @@ namespace GraphConsoleAppV3
                     Requests.AppMode().Wait();
                     break;
                 case 'b':
-                    Console.WriteLine("\nRunning app-only mode, followed by user mode\n\n");
-                    Requests.AppMode().Wait();
+                    Console.WriteLine("\nRunning user mode, followed by app-only mode\n\n");
                     Requests.UserMode().Wait();
+                    Requests.AppMode().Wait();
                     break;
                 case 'u':
                     Console.WriteLine("\nRunning in user mode\n\n");
