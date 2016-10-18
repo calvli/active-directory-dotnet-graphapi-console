@@ -7,8 +7,10 @@ using System.Collections.Generic;
 using System.Data.Services.Client;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Application = Microsoft.Azure.ActiveDirectory.GraphClient.Application;
 
 #endregion
 
@@ -446,12 +448,10 @@ namespace GraphConsoleAppV3
                 {
                     try
                     {
-                        Console.WriteLine("\nSpecify path of photo:");
-                        string photo = Console.ReadLine();
-                        FileStream fileStream = new FileStream(photo.Trim('"'), FileMode.Open,
-                            FileAccess.Read);
+                        string photo = "GraphConsoleAppV3.Resources.default.PNG";
+                        Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(photo);
 
-                        await user.ThumbnailPhoto.UploadAsync(fileStream, "application/image");
+                        await user.ThumbnailPhoto.UploadAsync(stream, "application/image");
                         Console.WriteLine("\nUser {0} was updated with a thumbnailphoto", user.DisplayName);
                     }
                     catch (Exception e)
