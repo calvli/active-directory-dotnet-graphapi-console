@@ -6,3 +6,4 @@ GraphConsoleAppV3/obj/*
 *.suo
 *.DotSettings*
 GraphConsoleAppV3/Program-old.cs
+packages/*
