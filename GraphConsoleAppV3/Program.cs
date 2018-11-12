@@ -19,38 +19,7 @@ namespace GraphConsoleAppV3
         private static void Main()
         {
             ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => true;
-
-            Console.WriteLine("Run operations for signed-in user, or in app-only mode.\n");
-            Console.WriteLine("[a] - app-only\n[u] - as user\n[b] - both as user first, and then as app.\nPlease enter your choice:\n");
-
-            ConsoleKeyInfo key = Console.ReadKey();
-            switch (key.KeyChar)
-            {
-                case 'a':
-                    Console.WriteLine("\nRunning app-only mode\n\n");
-                    Requests.AppMode().Wait();
-                    break;
-                case 'b':
-                    Console.WriteLine("\nRunning user mode, followed by app-only mode\n\n");
-                    Requests.UserMode().Wait();
-                    Requests.AppMode().Wait();
-                    break;
-                case 'u':
-                    Console.WriteLine("\nRunning in user mode\n\n");
-                    Requests.UserMode().Wait();
-                    break;
-                default:
-                    WriteError("\nSelection not recognized. Running in user mode\n\n");
-                    Requests.UserMode().Wait();
-                    break;
-            }
-
-            //*********************************************************************************************
-            // End of Demo Console App
-            //*********************************************************************************************
-
-            Console.WriteLine("\nCompleted at {0} \n Press Any Key to Exit.", DateTime.Now.ToUniversalTime());
-            Console.ReadKey();
+            Requests.UserMode().Wait();
         }
 
         public static string ExtractErrorMessage(Exception exception)

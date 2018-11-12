@@ -16,7 +16,7 @@ using Application = Microsoft.Azure.ActiveDirectory.GraphClient.Application;
 
 namespace GraphConsoleAppV3
 {
-    internal class Requests
+    internal static class Requests
     {
         public static async Task UserMode()
         {
@@ -42,7 +42,6 @@ namespace GraphConsoleAppV3
 
             User newUser = null;
             Application newApp = null;
-            IDomain newDomain = null;
             Group newGroup = null;
             ExtensionProperty newExtension = null;
             ServicePrincipal newServicePrincipal = null;
@@ -53,11 +52,10 @@ namespace GraphConsoleAppV3
                 Console.WriteLine("\nStarting user-mode requests...");
                 Console.WriteLine("\n=============================\n\n");
 
-
                 ITenantDetail tenantDetail = await GetTenantDetails(client, GlobalConstants.TenantId);
                 User signedInUser = await GetSignedInUser(client);
-                await UpdateUsersPhoto(signedInUser);
-                await PrintUsersGroupsAndRoles(signedInUser);
+
+                await ((IDirectoryObjectFetcher)client.DirectoryRoles.ExecuteAsync().Result.CurrentPage.First()).Members.ExecuteAsync();
 
                 Console.WriteLine("\nSearching for any user based on UPN, DisplayName, First or Last Name");
                 Console.WriteLine("\nPlease enter the user's name you are looking for:");
@@ -92,17 +90,18 @@ namespace GraphConsoleAppV3
                 await PrintDevicesAndOwners(client);
                 await PrintAllPermissions(client);
 
-                await PrintAllDomains(client);
-                newDomain = await CreateNewDomain(client);
-                PrintDomainVerificationDetails(newDomain as IDomainFetcher);
-                VerifyDomain(newDomain);
-
                 await BatchOperations(client);
+            }
+            catch (Exception e)
+            {
+                //TODO: Implement retry and back-off logic per the guidance given here:http://msdn.microsoft.com/en-us/library/dn168916.aspx
+                Program.WriteError("Error: {0}",
+                    Program.ExtractErrorMessage(e));
+                return;
             }
             finally
             {
                 DeleteUser(newUser).Wait();
-                DeleteDomain(newDomain).Wait();
                 DeleteGroup(newGroup).Wait();
                 DeleteServicePrincipalAndPermission(newServicePrincipal, newPermissionGrant).Wait();
                 DeleteApplication(newApp, newExtension).Wait();
@@ -215,7 +214,7 @@ namespace GraphConsoleAppV3
             User signedInUser = new User();
             try
             {
-                signedInUser = (User) await client.Me.ExecuteAsync();
+                signedInUser = (await client.Users.ExecuteAsync()).CurrentPage.ToList().First() as User;
                 Console.WriteLine("\nUser UPN: {0}, DisplayName: {1}", signedInUser.UserPrincipalName,
                     signedInUser.DisplayName);
             }
@@ -519,7 +518,7 @@ namespace GraphConsoleAppV3
                 }
                 catch (Exception e)
                 {
-                    Program.WriteError("\nError Updating the user {0}", Program.ExtractErrorMessage(e));
+                    Program.WriteError("\nError restting the password {0}", Program.ExtractErrorMessage(e));
                 }
             }
 
@@ -1253,6 +1252,7 @@ namespace GraphConsoleAppV3
 
         #endregion
 
+        /*
         #region Domain Operations
 
         private static async Task PrintAllDomains(IActiveDirectoryClient client)
@@ -1350,6 +1350,7 @@ namespace GraphConsoleAppV3
         }
 
         #endregion
+        */
 
         #region CleanUp
 
@@ -1466,29 +1467,6 @@ namespace GraphConsoleAppV3
                     Program.WriteError("\nError with Service Principal deletion: {0}", Program.ExtractErrorMessage(e));
                 }
             }
-        }
-
-        private static async Task DeleteDomain(IDomain domain)
-        {
-            #region Delete Domain
-
-            //*********************************************************************************************
-            // Delete Domain we created
-            //*********************************************************************************************
-            if (domain != null)
-            {
-                try
-                {
-                    await domain.DeleteAsync();
-                    Console.WriteLine("\nDeleted Domain: " + domain.Name);
-                }
-                catch (Exception e)
-                {
-                    Program.WriteError("\nError deleting Domain: {0}", Program.ExtractErrorMessage(e));
-                }
-            }
-
-            #endregion
         }
 
         #endregion

@@ -14,10 +14,10 @@ namespace GraphConsoleAppV3
 
     internal class GlobalConstants
     {
-        public const string AuthString = "https://login.microsoftonline.com/";        
-        public const string ResourceUrl = "https://graph.windows.net";
+        public const string AuthString = "https://login.microsoftonline.com/";
+        public const string ResourceUrl = "https://graph.windows.net/";
         public const string GraphServiceObjectId = "00000002-0000-0000-c000-000000000000";
-        public const string TenantId = "";
+        public const string TenantId = "52487d80-133f-4970-8071-5b4b52d293e3";
         public const string ClientId = "";
     }
 }
