@@ -53,9 +53,12 @@ namespace GraphConsoleAppV3
                 Console.WriteLine("\n=============================\n\n");
 
                 ITenantDetail tenantDetail = await GetTenantDetails(client, GlobalConstants.TenantId);
+
+                await client.Users.Expand(u => u.MemberOf).ExecuteAsync();
+
                 User signedInUser = await GetSignedInUser(client);
 
-                await ((IDirectoryObjectFetcher)client.DirectoryRoles.ExecuteAsync().Result.CurrentPage.First()).Members.ExecuteAsync();
+                // await ((IDirectoryObjectFetcher)client.DirectoryRoles.ExecuteAsync().Result.CurrentPage.First()).Members.ExecuteAsync();
 
                 Console.WriteLine("\nSearching for any user based on UPN, DisplayName, First or Last Name");
                 Console.WriteLine("\nPlease enter the user's name you are looking for:");
@@ -225,8 +228,10 @@ namespace GraphConsoleAppV3
 
             if (signedInUser.ObjectId != null)
             {
-                IUser sUser = (IUser) signedInUser;
-                IStreamFetcher photo = (IStreamFetcher) sUser.ThumbnailPhoto;
+                IList<DirectoryObject> memberOf = signedInUser.MemberOf;
+                Console.WriteLine("signed in user's memberOf: ", memberOf);
+
+                IStreamFetcher photo = ((IUser)signedInUser).ThumbnailPhoto;
                 try
                 {
                     DataServiceStreamResponse response =
