@@ -35,10 +35,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Azure.ActiveDirectory.GraphClient, Version=2.1.25.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>\\reddog\Builds\branches\git_ad_msods_core_gcl2_1_10\1.0.9342.93\retail-amd64\Microsoft.Azure.ActiveDirectory.GraphClient.dll</HintPath>
-    </Reference>
     <Reference Include="Microsoft.Data.Edm, Version=5.8.4.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>$(RootDir)\CxCache\Microsoft.Data.Edm.5.8.4\lib\net40\Microsoft.Data.Edm.dll</HintPath>
     </Reference>
@@ -80,6 +76,12 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\default.PNG" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="C:\git\AD\MSODS\Core\src\dev\RestServices\GraphClientLibrary\Version1.61\GraphClientPortable-local.csproj">
+      <Project>{8c4b8829-683a-4730-9756-94c44a042941}</Project>
+      <Name>GraphClientPortable-local</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

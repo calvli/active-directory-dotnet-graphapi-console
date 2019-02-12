@@ -54,9 +54,14 @@ namespace GraphConsoleAppV3
 
                 ITenantDetail tenantDetail = await GetTenantDetails(client, GlobalConstants.TenantId);
 
-                await client.Users.Expand(u => u.MemberOf).ExecuteAsync();
-
                 User signedInUser = await GetSignedInUser(client);
+
+
+                var str = signedInUser.ObjectId;
+                await client.Users.GetByObjectId(str).Expand(u => u.MemberOf).ExecuteAsync();
+                await client.Users.Where(user => user.ObjectId.Equals(str)).Expand(u => u.MemberOf).ExecuteAsync();
+
+                await client.Users.Where(user => user.ObjectId.Equals(str)).Expand(u => u.MemberOf).ExecuteAsync();
 
                 // await ((IDirectoryObjectFetcher)client.DirectoryRoles.ExecuteAsync().Result.CurrentPage.First()).Members.ExecuteAsync();
 
